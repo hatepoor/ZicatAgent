@@ -1,0 +1,49 @@
+# ZicatAgent 配置：复制为 mykey.py，取消下面一段注释，填好三项即可。
+# 按服务商的接口协议选择，不是按模型名字选择；第三方渠道换成它提供的地址。
+# 填好后运行 python agentmain.py。
+
+# ── OpenAI 兼容接口（GPT、Gemini、Claude 网关等都走这里）──
+# native_oai_config = {
+#     'apibase': 'https://api.openai.com/v1',  # API 地址
+#     'apikey': '填你的 API Key',
+#     'model': '填服务商提供的模型名',
+# }
+
+# ===== 到这里就可以用了。以下均可跳过，需要时再加。=====
+
+# ── 高级选项：把需要的行复制到上面的配置字典里，去掉开头的 # ──
+# 以下数值只是示例，不是默认值；未填写的选项由程序处理。
+#     'name': '主力模型',                 # 显示名；不填则用 model
+#     'proxy': 'http://127.0.0.1:7890',   # 此模型的 HTTP 代理
+#     'read_timeout': 180,              # 读取超时（秒）
+#     'timeout': 10,                    # 连接超时（秒）
+#     'max_retries': 3,                 # 请求重试次数
+#     'context_win': 100000,            # 历史裁剪参考窗口，非模型硬上限
+#     'max_tokens': 32768,              # 最大输出 token 数
+#     'temperature': 1.0,              # 仅在模型支持时设置
+#     'stream': False,                  # 渠道不支持流式时使用
+#     'reasoning_effort': 'high',       # 推理强度，取值依模型而定
+# 运行中也可临时调整（仅 --engine legacy 生效），例如：/session.reasoning_effort=high
+
+# ── 多模型 / 自动故障转移 ──
+# 复制配置块，变量名保留 native_oai_config / oai_config 前缀，加 1、2 等区分。
+# 每个模型设置不同的 name；下面按 name 排优先级，先启用对应模型再启用此组。
+# mixin_config = {
+#     'llm_nos': ['主力模型', '备用模型'],
+#     'max_retries': 5,
+#     'base_delay': 0.5,
+# }
+
+# ── 聊天平台（可选；在文件末尾取消对应行的注释，不要放进模型字典）──
+# 只启用需要的平台，并将 allowed_users 改成自己的用户 ID。
+# tg_bot_token = '填 Telegram Bot Token'
+# tg_allowed_users = [123456789]
+# qq_app_id, qq_app_secret = '填 App ID', '填 App Secret'
+# qq_allowed_users = ['填用户 OpenID']
+# fs_app_id, fs_app_secret = '填 App ID', '填 App Secret'
+# fs_allowed_users = ['填用户 OpenID']
+# wecom_bot_id, wecom_secret = '填 Bot ID', '填 Secret'
+# wecom_allowed_users = ['填用户 ID']
+# dingtalk_client_id, dingtalk_client_secret = '填 App Key', '填 App Secret'
+# dingtalk_allowed_users = ['填员工 ID']
+

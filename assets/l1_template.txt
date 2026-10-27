@@ -1,0 +1,26 @@
+# [Global Memory Insight]
+需要时 memory_read 读正文，或 ls ../memory/ 查 L3
+L0(META-SOP): memory_management_sop
+L2: 现空
+L3: memory_cleanup_sop(记忆整理) | salient_mining_sop(历史重点挖掘) | task_planning(任务规划)
+| autonomous_operation_sop | goal_mode_sop | goal_team_sop | goal_team_master_duty | ultraplan_sop
+| scheduled_task_sop | subagent | supervisor_sop | checklist_sop | project_mode_sop
+| review_sop | code_review_principles | deliverable_audit_sop | distill_sop
+| tmwebdriver_sop | web_setup_sop | vue3_component_sop | keychain
+L4: L4_raw_sessions/ 历史会话
+
+浏览器: tmwebdriver_sop(特性与坑) | web_setup_sop(装扩展)
+定时: scheduled_task_sop | 自主循环: autonomous_operation_sop | 长任务规划: ultraplan_sop | 目标模式: goal_mode_sop
+多worker: goal_team_sop(+master_duty) | 子代理: subagent | 监察: supervisor_sop | 检查单: checklist_sop
+代码评审: review_sop + code_review_principles | 交付验收: deliverable_audit_sop | 项目模式: project_mode_sop
+记忆整理: memory_cleanup_sop | 重点挖掘: salient_mining_sop | 技能蒸馏: distill_sop | Vue3 组件: vue3_component_sop | 密钥: keychain
+
+[RULES]
+1. 搜索先行: 搜文件名禁长时间递归, 网络搜索一定优先使用web工具的google, 优先看cwd，禁猜路径
+2. 交叉验证: 禁信摘要, 数值进详情页核实
+3. 编码安全: 禁PS cat/type用file_read; 改前必读; memory模块直接import(已在PATH,禁加虚假前缀)
+4. 闭环: 物理模拟后确认; 3次失败请求干预
+5. 进程: 禁无条件杀python(杀自己), 精确PID, 禁os.kill判活
+6. 窗口: GUI状态优先枚举标题
+7. web JS: 输入用原生setter+事件链, 点击前检disabled, 注意引号转义; scan空/不全先稍等再scan, 禁首扫定论
+8. SOP: 读SOP禁凭印象,有utils必用

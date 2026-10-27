@@ -1,0 +1,525 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "code_run",
+      "description": "Code executor. Prefer python. Multi-call OK, use script param. Reply code block is executed if no script arg; prefer for single call to avoid escaping. No hardcoding bulk data",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "description": "script"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "python",
+              "powershell"
+            ],
+            "description": "Code type",
+            "default": "python"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "in seconds",
+            "default": 60
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Working directory, defaults to cwd"
+          },
+          "inline_eval": {
+            "type": "boolean",
+            "description": "DO NOT USE except explicitly specified."
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "file_read",
+      "description": "Read file. Read before modify for latest context and line numbers",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Relative or absolute"
+          },
+          "start": {
+            "type": "integer",
+            "description": "Start line number (1-based)"
+          },
+          "count": {
+            "type": "integer",
+            "description": "Number of lines to read",
+            "default": 200
+          },
+          "show_linenos": {
+            "type": "boolean",
+            "description": "Show line numbers",
+            "default": true
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "file_patch",
+      "description": "Replace unique old_content with new_content. Exact match required (whitespace/indentation). On failure, file_read to recheck",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "File path"
+          },
+          "old_content": {
+            "type": "string",
+            "description": "Original text block to replace (must be unique)"
+          },
+          "new_content": {
+            "type": "string",
+            "description": "New content. Supports {{file:path:startLine:endLine}} to ref file lines, auto-expanded"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "file_write",
+      "description": "Create/overwrite/append files. HUGE edits ONLY. Supports {{file:path:startLine:endLine}}, auto-expanded",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "File path"
+          },
+          "content": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "overwrite",
+              "append",
+              "prepend"
+            ],
+            "description": "Write mode",
+            "default": "overwrite"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "grep",
+      "description": "Search file contents before file_read when you don't know where a symbol/string lives. Rust regex syntax; no lookaround/backrefs. Honors .gitignore. Returns path:line:text grouped by file.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "Regex, or literal when fixed_strings=true"
+          },
+          "path": {
+            "type": "string",
+            "description": "File or directory, relative to workspace",
+            "default": "."
+          },
+          "glob": {
+            "type": "string",
+            "description": "Only search files matching this glob, e.g. '*.py'"
+          },
+          "case_sensitive": {
+            "type": "boolean",
+            "default": false
+          },
+          "fixed_strings": {
+            "type": "boolean",
+            "default": false
+          },
+          "files_only": {
+            "type": "boolean",
+            "default": false
+          },
+          "context": {
+            "type": "integer",
+            "default": 0
+          },
+          "max_results": {
+            "type": "integer",
+            "default": 100
+          }
+        },
+        "required": [
+          "pattern"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "glob",
+      "description": "Find files by name or glob pattern. Use before reading when you don't know the file location.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "e.g. '**/*.py' or '*Tool*.ts*'"
+          },
+          "path": {
+            "type": "string",
+            "description": "Base directory",
+            "default": "."
+          },
+          "max_results": {
+            "type": "integer",
+            "default": 200
+          }
+        },
+        "required": [
+          "pattern"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "file_apply_patch",
+      "description": "Apply a multi-file/multi-hunk patch with context matching. Supports Add/Update/Delete/Move. Preferred when editing more than one location; use file_patch for one exact block.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "patch": {
+            "type": "string",
+            "description": "Text from *** Begin Patch to *** End Patch"
+          }
+        },
+        "required": [
+          "patch"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "web_scan",
+      "description": "Get simplified HTML and tab list. Removes hidden/floating/covered elements. Call after switching pages",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "tabs_only": {
+            "type": "boolean",
+            "description": "Show tab list only, no HTML"
+          },
+          "switch_tab_id": {
+            "type": "string",
+            "description": "[Optional] Tab ID to switch to"
+          },
+          "text_only": {
+            "type": "boolean",
+            "description": "Plain text only, no HTML"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "web_execute_js",
+      "description": "Execute JS. Multi-call OK with different switch_tab_id. No guessing. Act accurately to reduce web_scan calls. Execute JS in ```javascript blocks if no script arg, prefer to avoid escaping",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "description": "[Mutually exclusive] JS code or script path. NEVER use this param when use reply code block"
+          },
+          "save_to_file": {
+            "type": "string",
+            "description": "file path; **only** for long result"
+          },
+          "no_monitor": {
+            "type": "boolean",
+            "description": "Skip page change monitoring, saves 2-3s. Only for reads, not for page actions"
+          },
+          "switch_tab_id": {
+            "type": "string",
+            "description": "[Optional] Tab ID to switch to before executing"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "update_working_checkpoint",
+      "description": "Short-term working notepad (auto-injected each turn). Call early/mid task only when there is non-obvious state worth keeping. When: (1) after reading SOP — store needs & constraints (skip tasks <5 steps); (2) before subtask switch / context flush; (3) after repeated failures — re-read SOP and store new findings; (4) on new task — replace notepad, drop old progress, keep still-valid constraints.\n\nDon't call: tasks <5 steps, greetings, or when the task is done (use start_long_term_update instead).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "key_info": {
+            "type": "string",
+            "description": "Replaces current notepad (<200 tokens). Incremental update: review existing, keep valid, add/remove/modify. Store: pitfalls, user requirements, key params/findings, file paths, progress, next steps. Don't store: ephemeral info, obvious context, old task info when user switched tasks. Prefer over-updating over losing key info"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "ask_user",
+      "description": "Interrupt task to ask user when needing decisions, extra info, or facing unresolvable blockers. Multiple questions should in one call",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "For multiple questions, one per line (contain candidates)"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional quick-select choices for a single question only. Leave empty for multi-questions"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "start_long_term_update",
+      "description": "After a long task completes, distill long-term memory. Call when discovering info worth remembering (env facts/user prefs/lessons learned). Skip if memory already updated or in autonomous flow. Must call when a task that took 15+ turns is completed.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "memory_search",
+      "description": "Search long-term memory (SOPs/facts). Returns name, layer, kind, summary. Use this first when you need to recall any stored knowledge.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "keywords"
+          },
+          "layer": {
+            "type": "string",
+            "enum": [
+              "L1",
+              "L2",
+              "L3",
+              "L4"
+            ],
+            "description": "optional layer filter"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 5
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "memory_read",
+      "description": "Read the full body of one long-term memory entry.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "entry name"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "memory_write",
+      "description": "Create a new long-term memory entry. Fails if the name exists; use memory_patch to update. Only write after the information is verified by a successful tool call (No Execution, No Memory).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "layer": {
+            "type": "string",
+            "enum": [
+              "L1",
+              "L2",
+              "L3",
+              "L4"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "sop",
+              "script",
+              "insight"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "memory_patch",
+      "description": "Update a memory entry body. Creates a new version; old versions are kept.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "memory_archive",
+      "description": "Archive a memory entry (removed from the index; versions kept).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "memory_link",
+      "description": "Create a relation between two memory entries.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "rel": {
+            "type": "string",
+            "enum": [
+              "indexes",
+              "supersedes",
+              "depends",
+              "related"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "memory_index",
+      "description": "Show the current L1 index (dynamically generated from the memory DB).",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "sandbox_run",
+      "description": "在护栏沙箱内执行 python（进程级审计钩子：写/删仅限沙箱目录、禁起子进程、默认禁网、禁 ctypes、拒读 .env/mykey 与仓库源码与用户目录）。用途路由：调研计算/数据处理/运行不可信临时代码用本工具；本地开发或需直接操作仓库与用户文件用 code_run。护栏是防误操作的进程级约束，不是对抗性安全边界。高危模式（subprocess/ctypes/联网等）须先 ask_user 同意再带 confirmed=true 重试。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "python 代码"
+          },
+          "network": {
+            "type": "boolean",
+            "description": "允许联网（默认 false，需用户同意）"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "秒，默认 120，上限 600"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "description": "用户已确认高危模式（默认 false）"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      }
+    }
+  }
+]

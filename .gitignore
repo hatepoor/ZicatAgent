@@ -1,0 +1,50 @@
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# ── 虚拟环境 ──
+.venv/
+
+# ── 敏感文件（API Key 等，绝不入库）──
+mykey.py
+mykey.json
+.env
+*.db
+*.db-wal
+*.db-shm
+
+# ── 运行时产物 ──
+temp/
+tmp/
+.tmp/
+session/
+sche_tasks/
+*.zip
+*.log
+**log.*
+memory/file_access_stats.json
+
+# ── L4 归档：只追踪脚本，不追踪原始会话数据 ──
+memory/L4_raw_sessions/*.txt
+memory/L4_raw_sessions/*.zip
+
+# ── 记忆库（二进制）与机器生成快照：不进 git ──
+memory/memory.db
+memory/backup/
+memory/export/
+memstore/all_histories.txt
+.zcode/
+
+# ── 编辑器 ──
+.vs/
+.idea/
+.claude/
+
+# ── 前端（Web TUI 的依赖与构建产物）──
+node_modules/
+
+# ── 本地草稿 ──
+/BUG_*.md

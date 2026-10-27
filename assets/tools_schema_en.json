@@ -1,0 +1,525 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "code_run",
+      "description": "Execute code (python/powershell/bash). Complex tasks prefer python file mode; powershell/bash for one-liner system ops. timeout<=600s. Output is truncated.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "description": "code or script content"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "python",
+              "powershell"
+            ],
+            "description": "python|powershell|bash",
+            "default": "python"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "seconds (<=600)",
+            "default": 60
+          },
+          "cwd": {
+            "type": "string",
+            "description": "working dir for the run"
+          },
+          "inline_eval": {
+            "type": "boolean",
+            "description": "eval python inline (dangerous)"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "file_read",
+      "description": "Read a text file. Returns lines with optional start/count; keyword highlight supported.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "file path (relative to cwd)"
+          },
+          "start": {
+            "type": "integer",
+            "description": "start line"
+          },
+          "count": {
+            "type": "integer",
+            "description": "max lines",
+            "default": 200
+          },
+          "show_linenos": {
+            "type": "boolean",
+            "description": "show line numbers",
+            "default": true
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "file_patch",
+      "description": "Patch a file by exact old_content replacement. Read before patch; memory/ is forbidden.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "file path (relative to cwd)"
+          },
+          "old_content": {
+            "type": "string",
+            "description": "exact text to replace"
+          },
+          "new_content": {
+            "type": "string",
+            "description": "replacement text"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "file_write",
+      "description": "Write/create a file (content, optional append mode). Writing under memory/ is forbidden; use memory_write/memory_patch for the store.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "file path (relative to cwd)"
+          },
+          "content": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "overwrite",
+              "append",
+              "prepend"
+            ],
+            "description": "write mode (append optional)",
+            "default": "overwrite"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "grep",
+      "description": "Search file contents before file_read when you don't know where a symbol/string lives. Rust regex syntax; no lookaround/backrefs. Honors .gitignore. Returns path:line:text grouped by file.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "Regex, or literal when fixed_strings=true"
+          },
+          "path": {
+            "type": "string",
+            "description": "File or directory, relative to workspace",
+            "default": "."
+          },
+          "glob": {
+            "type": "string",
+            "description": "Only search files matching this glob, e.g. '*.py'"
+          },
+          "case_sensitive": {
+            "type": "boolean",
+            "default": false
+          },
+          "fixed_strings": {
+            "type": "boolean",
+            "default": false
+          },
+          "files_only": {
+            "type": "boolean",
+            "default": false
+          },
+          "context": {
+            "type": "integer",
+            "default": 0
+          },
+          "max_results": {
+            "type": "integer",
+            "default": 100
+          }
+        },
+        "required": [
+          "pattern"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "glob",
+      "description": "Find files by name or glob pattern. Use before reading when you don't know the file location.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "e.g. '**/*.py' or '*Tool*.ts*'"
+          },
+          "path": {
+            "type": "string",
+            "description": "Base directory",
+            "default": "."
+          },
+          "max_results": {
+            "type": "integer",
+            "default": 200
+          }
+        },
+        "required": [
+          "pattern"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "file_apply_patch",
+      "description": "Apply a multi-file/multi-hunk patch with context matching. Supports Add/Update/Delete/Move. Preferred when editing more than one location; use file_patch for one exact block.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "patch": {
+            "type": "string",
+            "description": "Text from *** Begin Patch to *** End Patch"
+          }
+        },
+        "required": [
+          "patch"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "web_scan",
+      "description": "Scan the user's real browser tabs (via Chrome extension): url/title/text or tabs-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "tabs_only": {
+            "type": "boolean",
+            "description": "list tabs only"
+          },
+          "switch_tab_id": {
+            "type": "string",
+            "description": "switch to tab id first"
+          },
+          "text_only": {
+            "type": "boolean",
+            "description": "text only"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "web_execute_js",
+      "description": "Execute JavaScript in the current browser tab (keeps login state). Use native setter + event chain for inputs; check disabled before clicking; mind quote escaping.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "description": "code or script content"
+          },
+          "save_to_file": {
+            "type": "string",
+            "description": "save result to file"
+          },
+          "no_monitor": {
+            "type": "boolean",
+            "description": "disable network monitoring"
+          },
+          "switch_tab_id": {
+            "type": "string",
+            "description": "switch to tab id first"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "update_working_checkpoint",
+      "description": "Update working memory (key_info). This block is re-injected into the model view at the end of every round as [WORKING MEMORY]: keep it a compact, up-to-date anchor of the current task — goal, key facts, decisions, next step. Store phase conclusions and important findings in time; do not repeat unchanged content. Clear stale parts when the task changes.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "key_info": {
+            "type": "string",
+            "description": "full working-memory text (overwrites)"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "ask_user",
+      "description": "Ask the user a question and pause the task (interrupt). Use only for user-only facts, value trade-offs, necessary authorization, or irreversible/high-impact decisions; provide candidates when possible.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "question text"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "candidate options"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "start_long_term_update",
+      "description": "Start the long-term memory update flow: per the L0 META-SOP, distill verified, long-lived facts/preferences/steps from the recent task into the memory store (write via memory_* tools only). Skip if nothing meets the bar.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "memory_search",
+      "description": "Search the memory store (FTS). Returns name/layer/summary of matched entries; read full body with memory_read.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "search query"
+          },
+          "layer": {
+            "type": "string",
+            "enum": [
+              "L1",
+              "L2",
+              "L3",
+              "L4"
+            ],
+            "description": "L2|L3"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 5
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "memory_read",
+      "description": "Read one memory entry's full body by name.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "entry name"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "memory_write",
+      "description": "Create a new memory entry (summary required: L1 recall depends on it). For new knowledge; to update an existing entry use memory_patch.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "layer": {
+            "type": "string",
+            "enum": [
+              "L1",
+              "L2",
+              "L3",
+              "L4"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "sop",
+              "script",
+              "insight"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "memory_patch",
+      "description": "Update an existing memory entry (body/summary); appends a new version, history preserved.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "memory_archive",
+      "description": "Archive a memory entry (soft-delete; versions/audit preserved).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "memory_link",
+      "description": "Link two memory entries with a relation (default related).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "rel": {
+            "type": "string",
+            "enum": [
+              "indexes",
+              "supersedes",
+              "depends",
+              "related"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "memory_index",
+      "description": "Render the current L1 index (names + summaries of active entries).",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "sandbox_run",
+      "description": "Execute python inside a guardrailed sandbox (process-level audit hook: writes/deletes limited to the sandbox dir, no subprocesses, no network by default, no ctypes, .env/mykey/repo source/user home reads denied). Routing: research computation / data processing / untrusted throwaway code use this tool; local development or direct repo/user-file operations use code_run. Guardrail prevents accidents, not adversarial escape. Dangerous patterns (subprocess/ctypes/network...) require ask_user consent, then retry with confirmed=true.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "python code"
+          },
+          "network": {
+            "type": "boolean",
+            "description": "allow network (default false, needs user consent)"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "seconds, default 120, max 600"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "description": "user confirmed dangerous patterns (default false)"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      }
+    }
+  }
+]

@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>架构说明</title>
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --surface: #ffffff;
+    --surface-2: #eef2f7;
+    --text: #16202e;
+    --muted: #5b6b7f;
+    --border: #d8dee7;
+    --edge: #8494a8;
+    --accent: #2563eb;
+    --accent-soft: rgba(37, 99, 235, .14);
+    --cycle: #dc2626;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 10px 28px rgba(16, 24, 40, .06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b111b;
+      --surface: #121a26;
+      --surface-2: #1a2433;
+      --text: #e8eef6;
+      --muted: #9aa9bb;
+      --border: #263346;
+      --edge: #5d7189;
+      --accent: #60a5fa;
+      --accent-soft: rgba(96, 165, 250, .16);
+      --cycle: #f87171;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 14px 36px rgba(0, 0, 0, .35);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  button, input { font: inherit; color: inherit; }
+
+  .topbar {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 28px clamp(16px, 4vw, 40px) 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .eyebrow {
+    margin: 0 0 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 { margin: 0; font-size: clamp(22px, 3vw, 30px); letter-spacing: -.02em; }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge.status.is-active { color: #067647; background: rgba(6, 118, 71, .10); border-color: rgba(6, 118, 71, .28); }
+  .badge.status.is-draft { color: #b45309; background: rgba(180, 83, 9, .10); border-color: rgba(180, 83, 9, .28); }
+  .badge.status.is-archived { color: var(--muted); }
+  .stats { display: flex; gap: 24px; flex: none; }
+  .stats div { display: flex; flex-direction: column; align-items: flex-end; }
+  .stats strong { font-size: 24px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stats span { font-size: 11px; color: var(--muted); }
+  .stats strong.bad { color: var(--cycle); }
+
+  .toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px 20px;
+    padding: 12px clamp(16px, 4vw, 40px);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 280px;
+    max-width: 420px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+  }
+  .search svg { flex: none; color: var(--muted); }
+  .search input { width: 100%; border: 0; outline: 0; background: transparent; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 3px; background: var(--surface-2); border: 1px solid var(--border); }
+  .line { position: relative; width: 22px; height: 0; border-top: 2px solid var(--edge); }
+  .line::after {
+    content: "";
+    position: absolute;
+    right: -1px;
+    top: -5px;
+    border: 4px solid transparent;
+    border-left-color: var(--edge);
+  }
+  .line.cycle { border-color: var(--cycle); }
+  .line.cycle::after { border-left-color: var(--cycle); }
+  .btn {
+    margin-left: auto;
+    padding: 7px 14px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface);
+    cursor: pointer;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .warning {
+    margin: 14px clamp(16px, 4vw, 40px) 0;
+    padding: 10px 14px;
+    border: 1px solid rgba(220, 38, 38, .30);
+    border-radius: 10px;
+    background: rgba(220, 38, 38, .08);
+    color: var(--cycle);
+    font-size: 12px;
+  }
+  .warning[hidden] { display: none; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    align-items: start;
+    gap: 18px;
+    padding: 18px clamp(16px, 4vw, 40px);
+  }
+
+  .canvas { position: relative; min-height: 320px; }
+  .edges {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+  .edge {
+    fill: none;
+    stroke: var(--edge);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    marker-end: url(#arrow);
+    transition: stroke .15s ease, opacity .15s ease;
+  }
+  .edge.active { stroke: var(--accent); stroke-width: 2.2; marker-end: url(#arrow-active); }
+  .edge.cycle { stroke: var(--cycle); marker-end: url(#arrow-cycle); }
+  .edge.dim { opacity: .12; }
+  #arrow path { fill: var(--edge); }
+  #arrow-active path { fill: var(--accent); }
+  #arrow-cycle path { fill: var(--cycle); }
+
+  .layers { position: relative; display: flex; flex-direction: column; gap: 14px; }
+  .layer {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 16px;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+  }
+  .layer-head { padding-top: 2px; }
+  .layer-index {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 6px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .layer-head h2 { margin: 6px 0 4px; font-size: 15px; }
+  .layer-head p { margin: 0; font-size: 12px; color: var(--muted); }
+  .layer-modules { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 12px; }
+  .layer-empty { align-self: center; color: var(--muted); font-size: 12px; }
+
+  .module {
+    position: relative;
+    z-index: 4;
+    flex: 0 1 220px;
+    min-width: 160px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 14px;
+    text-align: left;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease, opacity .15s ease;
+  }
+  .module:hover, .module:focus-visible {
+    transform: translateY(-1px);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    outline: none;
+  }
+  .module.selected { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .module.related { border-style: dashed; border-color: var(--accent); }
+  .module.dim { opacity: .26; filter: grayscale(.85); }
+  .module-name { font-weight: 700; font-size: 14px; }
+  .module-summary {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .module-foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 2px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .detail {
+    position: sticky;
+    top: 66px;
+    max-height: calc(100vh - 84px);
+    overflow: auto;
+    padding: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+  }
+  .detail-empty { padding: 40px 10px; text-align: center; color: var(--muted); }
+  .detail-empty h2 { margin: 12px 0 8px; font-size: 18px; color: var(--text); }
+  .detail-empty p { margin: 6px 0; font-size: 12px; }
+  .empty-icon { font-size: 34px; line-height: 1; color: var(--accent); }
+  .detail-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .detail-head h2 { margin: 4px 0 6px; font-size: 20px; }
+  .detail-summary { margin: 0; color: var(--muted); font-size: 13px; }
+  .icon-btn {
+    flex: none;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-2);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+  }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .detail-section { padding-top: 14px; }
+  .detail-section h3 {
+    margin: 0 0 8px;
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .plain-list { margin: 0; padding-left: 18px; }
+  .plain-list li { margin: 4px 0; font-size: 13px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--surface-2);
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    font-size: 11.5px;
+  }
+  .chip.dep { cursor: pointer; font-family: inherit; font-size: 12px; }
+  .chip.dep:hover { border-color: var(--accent); color: var(--accent); }
+  .detail-links {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .doc-link { color: var(--accent); font-weight: 600; text-decoration: none; }
+  .doc-link:hover { text-decoration: underline; }
+  .dev-link, .muted { color: var(--muted); }
+
+  .flow-section { padding: 0 clamp(16px, 4vw, 40px) 26px; }
+  .flow-section h2 { margin: 8px 0 12px; font-size: 16px; }
+  .flow-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .flow {
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+  }
+  .flow h3 { margin: 0 0 10px; font-size: 14px; }
+  .flow-steps { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .flow-steps li { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+  .flow-index {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 11px;
+  }
+  .flow-step-module {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .flow-step-module:hover { text-decoration: underline; }
+
+  footer { padding: 0 clamp(16px, 4vw, 40px) 32px; color: var(--muted); font-size: 12px; }
+
+  @media (max-width: 1000px) {
+    .layout { grid-template-columns: 1fr; }
+    .detail { position: static; max-height: none; }
+  }
+  @media (max-width: 720px) {
+    .topbar { flex-direction: column; align-items: flex-start; }
+    .stats { width: 100%; justify-content: flex-start; }
+    .layer { grid-template-columns: 1fr; }
+    .module { flex: 1 1 100%; }
+    .btn { margin-left: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+  @media print {
+    body { background: #fff; }
+    .toolbar, .detail, footer { display: none !important; }
+    .layout { display: block; padding: 0; }
+    .layer, .flow { box-shadow: none; break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div>
+    <p class="eyebrow">ARCHITECTURE</p>
+    <h1 id="title">架构说明</h1>
+    <div class="meta">
+      <span class="badge" id="versionBadge">v1</span>
+      <span class="badge status" id="statusBadge">生效</span>
+      <span id="range"></span>
+      <span id="basedOn"></span>
+      <span id="updated"></span>
+      <span id="decision"></span>
+    </div>
+    <div class="meta" id="changeSummary"></div>
+  </div>
+  <div class="stats">
+    <div><strong id="statModules">0</strong><span>模块</span></div>
+    <div><strong id="statDeps">0</strong><span>依赖</span></div>
+    <div><strong id="statCycles">0</strong><span>循环依赖</span></div>
+  </div>
+</header>
+
+<div class="toolbar">
+  <label class="search">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <circle cx="11" cy="11" r="7"></circle>
+      <path d="m20 20-3.5-3.5"></path>
+    </svg>
+    <input id="search" type="search" placeholder="搜索模块 / 职责 / 契约" autocomplete="off">
+  </label>
+  <div class="legend">
+    <span><i class="dot"></i>模块</span>
+    <span><i class="line"></i>依赖方向</span>
+    <span><i class="line cycle"></i>循环依赖</span>
+  </div>
+  <button class="btn" id="reset" type="button">重置视图</button>
+</div>
+
+<div class="warning" id="cycleWarning" hidden></div>
+
+<main class="layout">
+  <section class="canvas" id="canvas" aria-label="模块依赖图">
+    <svg class="edges" id="edges" aria-hidden="true"></svg>
+    <div class="layers" id="layers"></div>
+    <div class="detail-empty" id="empty" hidden>没有匹配的模块</div>
+  </section>
+  <aside class="detail" id="detail" aria-live="polite"></aside>
+</main>
+
+<section class="flow-section" id="flowSection">
+  <h2>关键数据流</h2>
+  <div class="flow-grid" id="flows"></div>
+</section>
+
+<footer id="footerNote">
+  本页面是 <code>arch/vN/index.md</code> 与 <code>modules.md</code> 的派生视图。更新架构时，请同步 markdown 与本文件的 ARCH 数据块；冲突时以 markdown 为准。
+</footer>
+
+<script>
+/* ============================================================
+   只需要修改这个数据块；下面的渲染逻辑保持不变。
+
+   约定：
+   - layers[].id      与 modules[].layer 对应
+   - modules[].id     必须与 modules.md 的小节锚点 <a id="..."></a> 一致
+   - dependsOn[]      只填模块 id，箭头从本模块指向被依赖模块
+   - flows[].steps[]  可以填模块 id（渲染为可点击按钮），也可以填普通文本
+   ============================================================ */
+const ARCH =const ARCH = {
+  "meta": {
+    "project": "ZicatAgent 内核版",
+    "version": "v1",
+    "status": "生效",
+    "range": "dev v0.1.0 ~ 至今",
+    "date": "2026-10-23",
+    "basedOn": "",
+    "decision": "ADR-0001",
+    "changeSummary": "相对前代：初版架构；LangGraph 单引擎 + SQLite 检查点/记忆 + JSONL RPC 前端"
+  },
+  "layers": [
+    {
+      "id": "access",
+      "name": "接入层",
+      "desc": "用户输入、命令分发、展示、RPC 协议"
+    },
+    {
+      "id": "application",
+      "name": "应用层",
+      "desc": "进程生命周期、模式路由、无人值守调度"
+    },
+    {
+      "id": "control",
+      "name": "控制层",
+      "desc": "图编排、模型视图、检查点、中断、回退"
+    },
+    {
+      "id": "capability",
+      "name": "能力层",
+      "desc": "工具执行、长期记忆、SOP 检索"
+    }
+  ],
+  "modules": [
+    {
+      "id": "ui",
+      "name": "交互前端",
+      "layer": "access",
+      "summary": "Python/TS 命令行、命令分发、JSONL RPC",
+      "responsibilities": [
+        "解析 slash 命令与普通任务",
+        "展示流式文本、工具卡片、用量与中断",
+        "提供 Web UI 与 RPC 协议"
+      ],
+      "contracts": [
+        "core.commands.handle(agent, raw, emit): bool",
+        "RPC: task/answer/abort/exit → ready/delta/tool/tool_result/usage/interrupt/done/exit",
+        "ui/server.mjs"
+      ],
+      "dependsOn": [
+        "runtime"
+      ],
+      "constraints": [
+        "不缓存会话状态",
+        "Web UI 经 SSE/POST 复用 RPC",
+        "RPC exit 必须等任务收尾"
+      ],
+      "devModule": "dev/v0.1.0/05-交互前端"
+    },
+    {
+      "id": "runtime",
+      "name": "运行入口",
+      "layer": "application",
+      "summary": "进程生命周期、模式路由、任务投递",
+      "responsibilities": [
+        "解析命令行参数",
+        "加载 mykey 与引擎配置",
+        "运行交互/--task/--func/--reflect/--rpc",
+        "消费任务队列并输出结果"
+      ],
+      "contracts": [
+        "ZicatAgent.put_task(query, source): Queue",
+        "ZicatAgent.run(): int",
+        "--task / --func / --reflect / --rpc",
+        "engine.settings.oai_configs()"
+      ],
+      "dependsOn": [
+        "engine",
+        "ops"
+      ],
+      "constraints": [
+        "单线程任务循环",
+        "--rpc 时 stdout 只输出 JSONL",
+        "--task 的 _stop 运行中生效"
+      ],
+      "devModule": "dev/v0.1.0/01-运行骨架"
+    },
+    {
+      "id": "ops",
+      "name": "自动化与工程",
+      "layer": "application",
+      "summary": "reflect 脚本、定时任务、测试与文档",
+      "responsibilities": [
+        "提供 scheduler/goal/autonomous/team 脚本",
+        "维护测试与验收",
+        "维护 docs/docx 文档体系与打包声明"
+      ],
+      "contracts": [
+        "reflect 脚本: INTERVAL/ONCE/init()/check()",
+        "sche_tasks/*.json",
+        "python -m unittest tests.test_engine tests.test_integration"
+      ],
+      "dependsOn": [],
+      "constraints": [
+        "reflect 脚本无状态",
+        "测试不依赖真实模型",
+        "文档三层边界不混写"
+      ],
+      "devModule": "dev/v0.1.0/06-质量与工程"
+    },
+    {
+      "id": "engine",
+      "name": "图引擎",
+      "layer": "control",
+      "summary": "LangGraph 状态图、模型视图、检查点、中断、回退",
+      "responsibilities": [
+        "维护只追加 ZicatState",
+        "构建模型视图（重锚/折叠/摘要）",
+        "执行工具节点与 ask_user 中断",
+        "检查点持久化与跨进程 resume",
+        "流式中断与用量/日志回调"
+      ],
+      "contracts": [
+        "ZicatState",
+        "build_graph(runtime, checkpointer, max_turns, context_cap, model, callbacks)",
+        "run_graph_task(agent, query, source, interrupt_handler)",
+        "resume_pending(agent, thread_id, answer)",
+        "build_model_messages(state, base_prompt, cap)"
+      ],
+      "dependsOn": [
+        "tools",
+        "memory"
+      ],
+      "constraints": [
+        "存储层消息永不删改",
+        "同 thread 串行",
+        "模型流式，chunk 间检查 stop_sig",
+        "检查点写 temp/graph.db"
+      ],
+      "devModule": "dev/v0.1.0/02-图引擎"
+    },
+    {
+      "id": "tools",
+      "name": "工具系统",
+      "layer": "capability",
+      "summary": "16 个工具、dispatch、schema、浏览器/文件/代码能力",
+      "responsibilities": [
+        "维护 assets/tools_schema.json 唯一 schema",
+        "反射 dispatch 到 zicat.do_*",
+        "实现文件/代码/浏览器/网页/记忆工具",
+        "维护工作记忆与文件回退跟踪"
+      ],
+      "contracts": [
+        "tools_schema.json",
+        "BaseHandler.dispatch(name, args, response, **kwargs)",
+        "StepOutcome(data, next_prompt, should_exit)",
+        "ToolRuntime.run_tool(name, args, ai)"
+      ],
+      "dependsOn": [
+        "memory"
+      ],
+      "constraints": [
+        "禁止写 memory/（code_run 旁路为已知限制）",
+        "schema 单一来源",
+        "结果统一 JSON 序列化"
+      ],
+      "devModule": "dev/v0.1.0/04-工具系统"
+    },
+    {
+      "id": "memory",
+      "name": "记忆系统",
+      "layer": "capability",
+      "summary": "SQLite 记忆库、7 个记忆工具、L1 渲染、同步/导出/备份",
+      "responsibilities": [
+        "管理 memory_items/versions/events/links/fts",
+        "实现 7 个 memory_* 工具语义",
+        "动态渲染 L1",
+        "迁移/同步/导出/备份与校验",
+        "维护 memory/kb SOP 布局"
+      ],
+      "contracts": [
+        "MemoryStore",
+        "memory_search/read/write/patch/archive/link/index",
+        "load_L1()/render_l1()",
+        "memstore.sync/export/backup/verify",
+        "memory/kb/*.md"
+      ],
+      "dependsOn": [],
+      "constraints": [
+        "版本/事件只追加",
+        "写入必须经 MemoryStore 事务",
+        "文件与库最终一致",
+        "L0 由代码读取 memory/kb/memory_management_sop.md"
+      ],
+      "devModule": "dev/v0.1.0/03-记忆系统"
+    }
+  ],
+  "flows": [
+    {
+      "name": "任务执行",
+      "steps": [
+        "用户输入",
+        "ui",
+        "runtime",
+        "engine",
+        "tools",
+        "finalize",
+        "ui"
+      ]
+    },
+    {
+      "name": "记忆写入",
+      "steps": [
+        "agent",
+        "tools",
+        "memory",
+        "memory_versions/events",
+        "memory_fts"
+      ]
+    },
+    {
+      "name": "中断恢复",
+      "steps": [
+        "engine",
+        "ask_user",
+        "checkpoint",
+        "cli /resume",
+        "engine"
+      ]
+    },
+    {
+      "name": "模型调用",
+      "steps": [
+        "engine",
+        "OpenAI 兼容接口",
+        "UsageTracker/LoggingCallback",
+        "temp/model_responses"
+      ]
+    }
+  ]
+};
+
+(function () {
+  "use strict";
+
+  var $ = function (sel, root) { return (root || document).querySelector(sel); };
+  var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
+  var SVG_NS = "http://www.w3.org/2000/svg";
+
+  var canvas = $("#canvas");
+  var svg = $("#edges");
+  var layersHost = $("#layers");
+  var detail = $("#detail");
+  var search = $("#search");
+  var empty = $("#empty");
+  var warning = $("#cycleWarning");
+
+  var modulesById = new Map();
+  var cardEls = new Map();
+  var layerEls = new Map();
+  var reverseDeps = new Map();
+  var selectedId = null;
+
+  ARCH.modules.forEach(function (m) {
+    modulesById.set(m.id, m);
+    reverseDeps.set(m.id, []);
+  });
+  ARCH.modules.forEach(function (m) {
+    (m.dependsOn || []).forEach(function (dep) {
+      if (reverseDeps.has(dep)) reverseDeps.get(dep).push(m.id);
+    });
+  });
+
+  var cycleEdges = findCycleEdges();
+
+  function escapeHtml(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function findCycleEdges() {
+    var color = new Map();
+    var edges = new Set();
+
+    function dfs(id) {
+      color.set(id, 1);
+      var deps = (modulesById.get(id) && modulesById.get(id).dependsOn) || [];
+      deps.forEach(function (dep) {
+        if (!modulesById.has(dep)) return;
+        var state = color.get(dep) || 0;
+        if (state === 1) {
+          edges.add(id + "->" + dep);
+        } else if (state === 0) {
+          dfs(dep);
+        }
+      });
+      color.set(id, 2);
+    }
+
+    ARCH.modules.forEach(function (m) {
+      if (!color.get(m.id)) dfs(m.id);
+    });
+    return edges;
+  }
+
+  function renderHeader() {
+    var meta = ARCH.meta || {};
+    document.title = (meta.project ? meta.project + " · " : "") + "架构图 " + (meta.version || "");
+    $("#title").textContent = (meta.project ? meta.project + " " : "") + "架构说明";
+    $("#versionBadge").textContent = meta.version || "未标注";
+
+    var status = meta.status || "未标注";
+    var badge = $("#statusBadge");
+    badge.textContent = status;
+    badge.className = "badge status " + (
+      status === "生效" ? "is-active" :
+      status === "草案" ? "is-draft" :
+      status === "已归档" ? "is-archived" : ""
+    );
+
+    $("#range").textContent = meta.range ? "生效范围: " + meta.range : "";
+    $("#basedOn").textContent = meta.basedOn ? "前代: " + meta.basedOn : "";
+    $("#updated").textContent = meta.date ? "更新: " + meta.date : "";
+    $("#decision").textContent = meta.decision ? "决策: " + meta.decision : "";
+    $("#changeSummary").textContent = meta.changeSummary || "";
+
+    var depCount = ARCH.modules.reduce(function (n, m) { return n + (m.dependsOn || []).length; }, 0);
+    $("#statModules").textContent = ARCH.modules.length;
+    $("#statDeps").textContent = depCount;
+    $("#statCycles").textContent = cycleEdges.size;
+    $("#statCycles").classList.toggle("bad", cycleEdges.size > 0);
+
+    if (cycleEdges.size > 0) {
+      warning.hidden = false;
+      warning.textContent = "检测到 " + cycleEdges.size + " 处循环依赖：" +
+        Array.from(cycleEdges).map(function (e) { return e.replace("->", " → "); }).join("，");
+    } else {
+      warning.hidden = true;
+    }
+  }
+
+  function buildCard(m) {
+    var card = document.createElement("button");
+    card.type = "button";
+    card.className = "module";
+    card.dataset.id = m.id;
+    card.innerHTML =
+      '<span class="module-name">' + escapeHtml(m.name) + '</span>' +
+      '<span class="module-summary">' + escapeHtml(m.summary || "") + '</span>' +
+      '<span class="module-foot"><span>' + ((m.dependsOn || []).length) + ' 依赖</span>' +
+      '<span>' + ((reverseDeps.get(m.id) || []).length) + ' 被依赖</span></span>';
+    card.addEventListener("mouseenter", function () { highlight(m.id); });
+    card.addEventListener("mouseleave", function () { highlight(null); });
+    card.addEventListener("focus", function () { highlight(m.id); });
+    card.addEventListener("blur", function () { highlight(null); });
+    card.addEventListener("click", function () { select(m.id); });
+    return card;
+  }
+
+  function renderLayers() {
+    layersHost.innerHTML = "";
+    cardEls.clear();
+    layerEls.clear();
+
+    function addLayer(layer, index, modulesOverride) {
+      var band = document.createElement("section");
+      band.className = "layer";
+      band.dataset.layer = layer.id;
+      layerEls.set(layer.id, band);
+
+      var head = document.createElement("div");
+      head.className = "layer-head";
+      head.innerHTML =
+        '<span class="layer-index">L' + (index + 1) + '</span>' +
+        '<h2>' + escapeHtml(layer.name) + '</h2>' +
+        '<p>' + escapeHtml(layer.desc || "") + '</p>';
+
+      var row = document.createElement("div");
+      row.className = "layer-modules";
+
+      var mods = modulesOverride || ARCH.modules.filter(function (m) { return m.layer === layer.id; });
+      if (!mods.length) {
+        var none = document.createElement("span");
+        none.className = "layer-empty";
+        none.textContent = "本层暂无模块";
+        row.appendChild(none);
+      }
+      mods.forEach(function (m) {
+        var card = buildCard(m);
+        cardEls.set(m.id, card);
+        row.appendChild(card);
+      });
+
+      band.appendChild(head);
+      band.appendChild(row);
+      layersHost.appendChild(band);
+    }
+
+    ARCH.layers.forEach(function (layer, index) { addLayer(layer, index); });
+
+    var known = new Set(ARCH.layers.map(function (l) { return l.id; }));
+    var orphan = ARCH.modules.filter(function (m) { return !known.has(m.layer); });
+    if (orphan.length) {
+      addLayer({ id: "__orphan__", name: "未分层", desc: "未在 layers 中声明的模块" }, ARCH.layers.length, orphan);
+    }
+  }
+
+  function renderFlows() {
+    var host = $("#flows");
+    var section = $("#flowSection");
+    if (!ARCH.flows || !ARCH.flows.length) {
+      section.hidden = true;
+      return;
+    }
+    section.hidden = false;
+    host.innerHTML = ARCH.flows.map(function (flow) {
+      var steps = (flow.steps || []).map(function (step, index) {
+        var mod = modulesById.get(step);
+        var body = mod
+          ? '<button type="button" class="flow-step-module" data-goto="' + escapeHtml(mod.id) + '">' + escapeHtml(mod.name) + '</button>'
+          : escapeHtml(step);
+        return '<li><span class="flow-index">' + (index + 1) + '</span>' + body + '</li>';
+      }).join("");
+      return '<article class="flow"><h3>' + escapeHtml(flow.name) + '</h3><ol class="flow-steps">' + steps + '</ol></article>';
+    }).join("");
+    $$("[data-goto]", host).forEach(function (btn) {
+      btn.addEventListener("click", function () { select(btn.dataset.goto); });
+    });
+  }
+
+  function detailSection(title, body) {
+    if (!body) return "";
+    return '<section class="detail-section"><h3>' + escapeHtml(title) + '</h3>' + body + '</section>';
+  }
+
+  function listHtml(items) {
+    if (!items || !items.length) return "";
+    return '<ul class="plain-list">' + items.map(function (item) {
+      return '<li>' + escapeHtml(item) + '</li>';
+    }).join("") + '</ul>';
+  }
+
+  function chipsHtml(items, className) {
+    if (!items || !items.length) return "";
+    return '<div class="chips">' + items.map(function (item) {
+      return '<code class="chip ' + (className || "") + '">' + escapeHtml(item) + '</code>';
+    }).join("") + '</div>';
+  }
+
+  function depChipsHtml(ids) {
+    if (!ids.length) return '<p class="muted">无</p>';
+    return '<div class="chips">' + ids.map(function (id) {
+      var m = modulesById.get(id);
+      return '<button type="button" class="chip dep" data-goto="' + escapeHtml(id) + '">' + escapeHtml(m ? m.name : id) + '</button>';
+    }).join("") + '</div>';
+  }
+
+  function emptyDetailHtml() {
+    return '<div class="detail-empty">' +
+      '<div class="empty-icon">◇</div>' +
+      '<h2>模块详情</h2>' +
+      '<p>点击左侧任意模块，查看职责、契约与依赖。</p>' +
+      '<p>悬停可高亮直接依赖；搜索框支持按模块名、职责或契约过滤。</p>' +
+      '</div>';
+  }
+
+  function renderDetail(id) {
+    var m = modulesById.get(id);
+    if (!m) {
+      detail.innerHTML = emptyDetailHtml();
+      return;
+    }
+    var layer = ARCH.layers.find(function (l) { return l.id === m.layer; });
+    var deps = (m.dependsOn || []).filter(function (d) { return modulesById.has(d); });
+    var rev = reverseDeps.get(id) || [];
+
+    detail.innerHTML =
+      '<div class="detail-head">' +
+        '<div>' +
+          '<p class="eyebrow">' + escapeHtml(layer ? layer.name : "未分层") + '</p>' +
+          '<h2>' + escapeHtml(m.name) + '</h2>' +
+          '<p class="detail-summary">' + escapeHtml(m.summary || "") + '</p>' +
+        '</div>' +
+        '<button type="button" class="icon-btn" id="closeDetail" aria-label="关闭详情">×</button>' +
+      '</div>' +
+      detailSection("职责", listHtml(m.responsibilities)) +
+      detailSection("对外契约", chipsHtml(m.contracts, "contract")) +
+      detailSection("依赖", depChipsHtml(deps)) +
+      detailSection("被依赖", depChipsHtml(rev)) +
+      detailSection("关键约束", listHtml(m.constraints)) +
+      '<div class="detail-links">' +
+        '<a class="doc-link" href="./modules.md#' + encodeURIComponent(m.id) + '">在 modules.md 中查看 →</a>' +
+        (m.devModule ? '<span class="dev-link">对应开发模块: ' + escapeHtml(m.devModule) + '</span>' : "") +
+      '</div>';
+
+    $("#closeDetail").addEventListener("click", clearSelection);
+    $$("[data-goto]", detail).forEach(function (btn) {
+      btn.addEventListener("click", function () { select(btn.dataset.goto); });
+    });
+  }
+
+  function highlight(id) {
+    var active = id || selectedId;
+    var related = new Set();
+    if (active) {
+      related.add(active);
+      var m = modulesById.get(active);
+      (m && m.dependsOn || []).forEach(function (d) { related.add(d); });
+      (reverseDeps.get(active) || []).forEach(function (d) { related.add(d); });
+    }
+
+    $$(".module").forEach(function (card) {
+      var on = !active || related.has(card.dataset.id);
+      card.classList.toggle("dim", !on);
+      card.classList.toggle("related", !!active && on && card.dataset.id !== active);
+    });
+
+    $$(".edge").forEach(function (edge) {
+      var from = edge.dataset.from;
+      var to = edge.dataset.to;
+      var isCycle = edge.classList.contains("cycle");
+      var on = !active || from === active || to === active;
+      edge.classList.toggle("dim", !on);
+      edge.classList.toggle("active", !!active && (from === active || to === active));
+      edge.setAttribute("marker-end", isCycle
+        ? "url(#arrow-cycle)"
+        : (!!active && (from === active || to === active) ? "url(#arrow-active)" : "url(#arrow)"));
+    });
+  }
+
+  function select(id) {
+    if (!modulesById.has(id)) return;
+    selectedId = id;
+    $$(".module").forEach(function (card) {
+      card.classList.toggle("selected", card.dataset.id === id);
+    });
+    renderDetail(id);
+    highlight(id);
+    if (window.matchMedia && window.matchMedia("(max-width: 1000px)").matches) {
+      detail.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  function clearSelection() {
+    selectedId = null;
+    $$(".module").forEach(function (card) { card.classList.remove("selected"); });
+    detail.innerHTML = emptyDetailHtml();
+    highlight(null);
+  }
+
+  function applySearch() {
+    var query = search.value.trim().toLowerCase();
+    var visible = 0;
+
+    cardEls.forEach(function (card, id) {
+      var m = modulesById.get(id);
+      var haystack = [
+        m.name,
+        m.summary,
+        (m.responsibilities || []).join(" "),
+        (m.contracts || []).join(" ")
+      ].join(" ").toLowerCase();
+      var match = !query || haystack.indexOf(query) !== -1;
+      card.classList.toggle("dim", !match);
+      if (match) visible += 1;
+    });
+
+    empty.hidden = visible > 0 || !query;
+
+    $$(".edge").forEach(function (edge) {
+      var fromCard = cardEls.get(edge.dataset.from);
+      var toCard = cardEls.get(edge.dataset.to);
+      var dim = (fromCard && fromCard.classList.contains("dim")) ||
+                (toCard && toCard.classList.contains("dim"));
+      edge.classList.toggle("dim", !!dim);
+    });
+  }
+
+  function buildPath(a, b, canvasRect) {
+    var ax = a.left + a.width / 2 - canvasRect.left;
+    var ay = a.top + a.height / 2 - canvasRect.top;
+    var bx = b.left + b.width / 2 - canvasRect.left;
+    var by = b.top + b.height / 2 - canvasRect.top;
+    var dx = bx - ax;
+    var dy = by - ay;
+    var vertical = Math.abs(dy) >= Math.abs(dx);
+
+    if (vertical) {
+      var down = dy >= 0;
+      var y1 = down ? a.bottom - canvasRect.top : a.top - canvasRect.top;
+      var y2 = down ? b.top - canvasRect.top : b.bottom - canvasRect.top;
+      var cv = Math.max(36, Math.min(140, Math.abs(y2 - y1) * 0.45));
+      return {
+        d: "M " + ax + " " + y1 +
+           " C " + ax + " " + (down ? y1 + cv : y1 - cv) +
+           ", " + bx + " " + (down ? y2 - cv : y2 + cv) +
+           ", " + bx + " " + y2,
+        vertical: true,
+        x: ax,
+        y1: y1,
+        y2: y2
+      };
+    }
+
+    var right = dx >= 0;
+    var x1 = right ? a.right - canvasRect.left : a.left - canvasRect.left;
+    var x2 = right ? b.left - canvasRect.left : b.right - canvasRect.left;
+    var ch = Math.max(36, Math.min(160, Math.abs(x2 - x1) * 0.45));
+    return {
+      d: "M " + x1 + " " + ay +
+         " C " + (right ? x1 + ch : x1 - ch) + " " + ay +
+         ", " + (right ? x2 - ch : x2 + ch) + " " + by +
+         ", " + x2 + " " + by,
+      vertical: false,
+      x: x1,
+      y1: ay,
+      y2: by
+    };
+  }
+
+  function buildLanePath(a, b, sourceLayerRect, targetLayerRect, canvasRect) {
+    var below = b.top > a.top;
+    var startX = a.left + a.width / 2 - canvasRect.left;
+    var endX = b.left + b.width / 2 - canvasRect.left;
+    var laneX = startX < canvasRect.width / 2 ? canvasRect.width - 20 : 20;
+    var startY = below ? a.bottom - canvasRect.top : a.top - canvasRect.top;
+    var endY = below ? b.top - canvasRect.top : b.bottom - canvasRect.top;
+    var nearY = below
+      ? sourceLayerRect.bottom - canvasRect.top + 7
+      : sourceLayerRect.top - canvasRect.top - 7;
+    var farY = below
+      ? targetLayerRect.top - canvasRect.top - 7
+      : targetLayerRect.bottom - canvasRect.top + 7;
+
+    return "M " + startX + " " + startY +
+           " L " + startX + " " + nearY +
+           " L " + laneX + " " + nearY +
+           " L " + laneX + " " + farY +
+           " L " + endX + " " + farY +
+           " L " + endX + " " + endY;
+  }
+
+  function pathHitsCard(geom, sourceId, targetId, canvasRect) {
+    if (!geom.vertical) return false;
+    var lo = Math.min(geom.y1, geom.y2);
+    var hi = Math.max(geom.y1, geom.y2);
+    var hit = false;
+    cardEls.forEach(function (card, id) {
+      if (hit || id === sourceId || id === targetId) return;
+      var r = card.getBoundingClientRect();
+      var x1 = r.left - canvasRect.left;
+      var x2 = r.right - canvasRect.left;
+      var y1 = r.top - canvasRect.top;
+      var y2 = r.bottom - canvasRect.top;
+      if (geom.x > x1 && geom.x < x2 && Math.max(lo, y1) < Math.min(hi, y2)) hit = true;
+    });
+    return hit;
+  }
+
+  function drawEdges() {
+    var rect = canvas.getBoundingClientRect();
+    var width = Math.max(1, Math.round(rect.width));
+    var height = Math.max(1, Math.round(rect.height));
+    svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+    svg.setAttribute("width", width);
+    svg.setAttribute("height", height);
+
+    svg.innerHTML =
+      '<defs>' +
+        '<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">' +
+          '<path d="M 0 0 L 10 5 L 0 10 z"></path>' +
+        '</marker>' +
+        '<marker id="arrow-active" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">' +
+          '<path d="M 0 0 L 10 5 L 0 10 z"></path>' +
+        '</marker>' +
+        '<marker id="arrow-cycle" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">' +
+          '<path d="M 0 0 L 10 5 L 0 10 z"></path>' +
+        '</marker>' +
+      '</defs>';
+
+    ARCH.modules.forEach(function (m) {
+      (m.dependsOn || []).forEach(function (depId) {
+        var fromCard = cardEls.get(m.id);
+        var toCard = cardEls.get(depId);
+        if (!fromCard || !toCard) return;
+
+        var a = fromCard.getBoundingClientRect();
+        var b = toCard.getBoundingClientRect();
+        if (!a.width || !b.width) return;
+
+        var pathData = buildPath(a, b, rect);
+        var pathD = pathData.d;
+
+        if (pathHitsCard(pathData, m.id, depId, rect)) {
+          var sourceLayer = layerEls.get(m.layer);
+          var targetModule = modulesById.get(depId);
+          var targetLayer = targetModule && layerEls.get(targetModule.layer);
+          if (sourceLayer && targetLayer) {
+            pathD = buildLanePath(
+              a,
+              b,
+              sourceLayer.getBoundingClientRect(),
+              targetLayer.getBoundingClientRect(),
+              rect
+            );
+          }
+        }
+
+        var path = document.createElementNS(SVG_NS, "path");
+        var key = m.id + "->" + depId;
+        path.setAttribute("d", pathD);
+        path.setAttribute("class", "edge" + (cycleEdges.has(key) ? " cycle" : ""));
+        path.setAttribute("marker-end", cycleEdges.has(key) ? "url(#arrow-cycle)" : "url(#arrow)");
+        path.dataset.from = m.id;
+        path.dataset.to = depId;
+        svg.appendChild(path);
+      });
+    });
+
+    if (selectedId) highlight(selectedId);
+  }
+
+  var drawRaf = 0;
+  function scheduleDraw() {
+    cancelAnimationFrame(drawRaf);
+    drawRaf = requestAnimationFrame(drawEdges);
+  }
+
+  renderHeader();
+  renderLayers();
+  renderFlows();
+  detail.innerHTML = emptyDetailHtml();
+  requestAnimationFrame(drawEdges);
+
+  search.addEventListener("input", applySearch);
+  $("#reset").addEventListener("click", function () {
+    search.value = "";
+    applySearch();
+    clearSelection();
+    scheduleDraw();
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") clearSelection();
+  });
+
+  window.addEventListener("resize", scheduleDraw);
+  if ("ResizeObserver" in window) {
+    new ResizeObserver(scheduleDraw).observe(canvas);
+  }
+
+  var initialHash = decodeURIComponent(location.hash.replace(/^#/, ""));
+  if (initialHash && modulesById.has(initialHash)) {
+    select(initialHash);
+  }
+})();
+</script>
+</body>
+</html>
