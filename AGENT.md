@@ -192,5 +192,5 @@ node ui/server.mjs   # → http://127.0.0.1:8765
 
 - `code_run` 以当前用户权限执行任意代码；`inline_eval` 在进程内 eval。
 - 不读取/移动 `mykey.py`、`.env` 等密钥文件；日志与提交里不得出现 key。
-- 浏览器工具依赖本机 Chrome 扩展，不要假设 headless 环境可用。
+- 浏览器工具依赖本机 Chromium 系浏览器（Chrome/Edge）的扩展，不要假设 headless 环境可用；master 常驻进程（cmdline 含 TMWebDriver.py）由首次调用自动拉起，不要当异常进程杀掉。
 - 任何不可逆操作（删除、覆盖、推送、安装）先向用户确认。

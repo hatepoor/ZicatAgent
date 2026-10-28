@@ -131,7 +131,7 @@ web_execute_js script='{"cmd": "batch", "commands": [...]}'
 ## 连不上排查
 web_scan失败时按序排查（自动检测优先，用户参与放最后）：
 ①浏览器没开？→检查浏览器进程是否在跑(tasklist/ps)，没有则启动并打开正常URL（⚠about:blank等内部页不加载扩展）
-②WS后台挂了？→本机18766端口没监听即dead→手动**后台持续运行**`from TMWebDriver import TMWebDriver; TMWebDriver()`起master
-③扩展没装？→读Chrome用户目录下`Secure Preferences`→`extensions.settings`中找`path`含`tmwd_cdp_bridge`的条目
+②WS后台挂了？→本机18766端口没监听即dead。首选：直接调一次web_scan，`_ensure_master`会自动后台拉起常驻master（detached `python TMWebDriver.py`）；手动排障用 `python TMWebDriver.py` 起常驻（⚠不要用旧写法`TMWebDriver()`——daemon线程随进程退出即死）。扩展已连常驻master时，任何agent进程重启都秒接，无需等重连
+③扩展没装？→读浏览器用户目录下`Secure Preferences`（Chrome：`%LOCALAPPDATA%\Google\Chrome\User Data\Default\`；Edge：`%LOCALAPPDATA%\Microsoft\Edge\User Data\Default\`）→`extensions.settings`中找`path`含`tmwd_cdp_bridge`的条目
   找到→扩展已装，排查其他原因；没找到→走web_setup_sop
 ④以上都正常仍连不上→请求用户协助

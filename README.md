@@ -124,7 +124,7 @@ memstore/        SQLite 记忆库（schema/仓库/工具/迁移/校验/同步/�
 ui/              唯一用户前端（React 19 + Vite + Tailwind；Node 桥 server.mjs 走 --rpc，SSE+POST）
 tests/           单测 + 进程集成（python -m unittest tests.test_engine tests.test_integration）
 simphtml.py      网页 HTML 整理（web_scan 依赖）
-TMWebDriver.py   本地 WS + Chrome 扩展，操作真实浏览器
+TMWebDriver.py   本地 WS + Chromium 系扩展（Chrome/Edge），操作真实浏览器；可常驻复用
 reflect/         无人值守：scheduler / goal_mode / checklist_master / agent_team_worker / autonomous
 memory/          运行时：SQLite 记忆库 + kb/（SOP 文档）+ L4 归档/备份/导出
 assets/          提示词、工具 schema、浏览器扩展
