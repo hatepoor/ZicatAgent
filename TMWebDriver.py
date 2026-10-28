@@ -38,17 +38,32 @@ class Session:
 
 
 class TMWebDriver:  
-    def __init__(self, host: str = '127.0.0.1', port: int = 18765):  
+    def __init__(self, host: str = '127.0.0.1', port: int = 18765):
         self.host, self.port = host, port
         self.sessions, self.results, self.acks = {}, {}, {}
-        self.default_session_id = None  
-        self.latest_session_id = None  
-        self.is_remote = socket.socket().connect_ex((host, port+1)) == 0
-        if not self.is_remote:  
-            self.start_ws_server()  
+        self.default_session_id = None
+        self.latest_session_id = None
+        self.remote = f'http://{host}:{port+1}/link'
+        self.is_remote = self._probe_remote()
+        if not self.is_remote:
+            self.start_ws_server()
             self.start_http_server()
-        else:
-            self.remote = f'http://{self.host}:{self.port+1}/link'
+
+    def _probe_remote(self):
+        probe = socket.socket()
+        probe.settimeout(0.5)
+        try:
+            alive = probe.connect_ex((self.host, self.port+1)) == 0
+        finally:
+            probe.close()
+        if not alive:
+            return False
+        try:
+            self._remote_cmd({"cmd": "get_all_sessions"})
+            return True
+        except (ConnectionError, requests.exceptions.ConnectionError):
+            safe_print(f"端口 {self.port+1} 已被占用但 master 无响应，本进程改为自行启动服务")
+            return False
 
     def start_http_server(self):
         self.app = app = bottle.Bottle()
@@ -111,7 +126,10 @@ class TMWebDriver:
             class _T(ThreadingMixIn, WSGIServer): pass
             class _H(WSGIRequestHandler):
                 def log_request(self, *a): pass
-            make_server(self.host, self.port+1, app, server_class=_T, handler_class=_H).serve_forever()
+            try:
+                make_server(self.host, self.port+1, app, server_class=_T, handler_class=_H).serve_forever()
+            except OSError as e:
+                safe_print(f"HTTP 服务 {self.host}:{self.port+1} 启动失败（端口占用?）: {e}")
         http_thread = threading.Thread(target=run, daemon=True)
         http_thread.start()  
 
@@ -160,7 +178,11 @@ class TMWebDriver:
                 safe_print(f"WS Connection closed: {self.address}")
                 driver._unregister_client(self)  
         
-        self.server = WebSocketServer(self.host, self.port, JSExecutor)  
+        try:
+            self.server = WebSocketServer(self.host, self.port, JSExecutor)
+        except OSError as e:
+            raise OSError(f"无法绑定 ws://{self.host}:{self.port}，"
+                          f"可能被残留进程占用（netstat -ano | findstr {self.port}），原始错误: {e}")
         server_thread = threading.Thread(target=self.server.serve_forever)  
         server_thread.daemon = True  
         server_thread.start()  

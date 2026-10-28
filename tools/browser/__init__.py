@@ -13,18 +13,29 @@ from tools.util import format_error, smart_format
 driver = None
 
 
-def first_init_driver():
+def first_init_driver(max_wait=60):
     global driver
     from TMWebDriver import TMWebDriver
     driver = TMWebDriver()
-    for i in range(7):
-        time.sleep(2)
-        sess = driver.get_all_sessions()
+    opened = False
+    for i in range(max_wait):
+        time.sleep(1)
+        try:
+            sess = driver.get_all_sessions()
+        except Exception:
+            sess = []
         if len(sess) > 0:
             break
-        if i == 4:
+        if not opened and i >= 2:
             import webbrowser
             webbrowser.open("https://example.com")
+            opened = True
+
+
+NO_TAB_HINT = ("没有可用的浏览器标签页:浏览器扩展(TMWD CDP Bridge)未连上 master。"
+               "排查:1)浏览器已打开普通网页(chrome://页不可注入);"
+               "2)扩展已加载且未停用(assets/tmwd_cdp_bridge);"
+               "3)18765/18766端口未被残留进程占用;若仍失败,查L3记忆分析原因。")
 
 
 def _web_scan(tabs_only=False, switch_tab_id=None, text_only=False, maxlen=35000):
@@ -35,7 +46,7 @@ def _web_scan(tabs_only=False, switch_tab_id=None, text_only=False, maxlen=35000
         if driver is None:
             first_init_driver()
         if len(driver.get_all_sessions()) == 0:
-            return {"status": "error", "msg": "没有可用的浏览器标签页，查L3记忆分析原因。"}
+            return {"status": "error", "msg": NO_TAB_HINT}
         tabs = []
         for sess in driver.get_all_sessions():
             sess.pop('connected_at', None)
@@ -71,7 +82,7 @@ def _web_execute_js(script, switch_tab_id=None, no_monitor=False):
         if driver is None:
             first_init_driver()
         if len(driver.get_all_sessions()) == 0:
-            return {"status": "error", "msg": "没有可用的浏览器标签页，查L3记忆分析原因。"}
+            return {"status": "error", "msg": NO_TAB_HINT}
         if switch_tab_id:
             driver.default_session_id = str(switch_tab_id)
         result = simphtml.execute_js_rich(script, driver, no_monitor=no_monitor)
