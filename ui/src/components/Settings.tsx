@@ -19,6 +19,8 @@ const blankModel = (): ModelConfig => ({
   context_window: "",
   max_tokens: "",
   temperature: "",
+  provider: "openai",
+  reasoning_effort: "",
 });
 
 const maskKey = (value: string) => {
@@ -106,6 +108,7 @@ export function ModelSettings({ models, active, onClose, onSave, onSwitch, onRev
       name: draft.name || draft.model,
       model: draft.model,
       base_url: draft.base_url,
+      provider: draft.provider || "openai",
       context_window: String(draft.context_window ?? ""),
       max_tokens: String(draft.max_tokens ?? ""),
       temperature: String(draft.temperature ?? ""),
@@ -179,6 +182,23 @@ export function ModelSettings({ models, active, onClose, onSave, onSwitch, onRev
               <div>
                 <Field label="模型名" value={String(draft.model ?? "")} onChange={(v) => update("model", v)} placeholder="deepseek/deepseek-v4.1-flash" />
               </div>
+              <div>
+                <label className="mb-3 block">
+                  <span className="mb-1 block text-[11px]" style={{ color: "var(--dim)" }}>接口类型</span>
+                  <select
+                    value={draft.provider || "openai"}
+                    onChange={(e) => update("provider", e.target.value)}
+                    className="w-full rounded border bg-transparent px-2 py-1.5 text-[12px] outline-none"
+                    style={{ borderColor: "var(--border)", color: "var(--fg)", background: "var(--panelSoft)" }}
+                  >
+                    <option value="openai">OpenAI Chat Completions（通用）</option>
+                    <option value="deepseek">DeepSeek（reasoning 回传）</option>
+                  </select>
+                  <span className="mt-1 block text-[10px]" style={{ color: "var(--faint)" }}>
+                    DeepSeek 模型走工具调用时请选 DeepSeek 接口
+                  </span>
+                </label>
+              </div>
               <div className="md:col-span-2">
                 <Field label="Base URL" value={String(draft.base_url ?? "")} onChange={(v) => update("base_url", v)} placeholder="https://api.example.com/v1" />
               </div>
@@ -228,6 +248,9 @@ export function ModelSettings({ models, active, onClose, onSave, onSwitch, onRev
               </div>
               <div>
                 <Field label="temperature" value={String(draft.temperature ?? "")} onChange={(v) => update("temperature", v)} placeholder="0.7" />
+              </div>
+              <div className="md:col-span-2 text-[10px]" style={{ color: "var(--faint)" }}>
+                思考强度：{draft.reasoning_effort || "未设置"}（保存后可用 /effort 调整）
               </div>
             </div>
 

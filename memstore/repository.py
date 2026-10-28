@@ -234,6 +234,41 @@ class MemoryStore:
                 "WHERE id = ?", (_now(), item_id))
             self._event(conn, item_id, event, actor, session_id, {})
 
+    def touch_many(self, item_ids: Iterable[str], actor: str = "agent",
+                   session_id: Optional[str] = None, event: str = "read") -> None:
+        """批量记录访问：一条 UPDATE + 每条目一条事件，共用一个写事务。"""
+        ids = [item_id for item_id in dict.fromkeys(item_ids) if item_id]
+        if not ids:
+            return
+        placeholders = ",".join("?" * len(ids))
+        with self.tx() as conn:
+            conn.execute(
+                f"UPDATE memory_items SET access_count = access_count + 1, last_access_at = ? "
+                f"WHERE id IN ({placeholders})",
+                (_now(), *ids),
+            )
+            for item_id in ids:
+                self._event(conn, item_id, event, actor, session_id, {})
+
+    def read_with_meta(self, name_or_id: str, actor: str = "agent",
+                       session_id: Optional[str] = None) -> Optional[tuple[Item, int]]:
+        """读取正文 + 版本数，并把访问计数与事件放在同一个写事务里。"""
+        item = self.get(name_or_id)
+        if not item:
+            return None
+        now = _now()
+        with self.tx() as conn:
+            conn.execute(
+                "UPDATE memory_items SET access_count = access_count + 1, last_access_at = ? "
+                "WHERE id = ?", (now, item.id))
+            self._event(conn, item.id, "read", actor, session_id, {"name": item.name})
+            version = int(conn.execute(
+                "SELECT count(*) FROM memory_versions WHERE item_id = ?", (item.id,)
+            ).fetchone()[0])
+        item.access_count += 1
+        item.last_access_at = now
+        return item, version
+
     def render_l1(self, max_chars: int = 2000, log: bool = True) -> str:
         items = self.list_items(layers=("L2", "L3"), status="active", limit=80)
         rules = self.get("l1_rules")

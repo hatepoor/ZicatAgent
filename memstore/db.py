@@ -5,7 +5,7 @@ import sqlite3
 import threading
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 DEFAULT_DB = Path(__file__).resolve().parent.parent / "memory" / "memory.db"
 _SCHEMA_SQL = Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
 
@@ -38,7 +38,15 @@ class Database:
             version = self.conn.execute("PRAGMA user_version").fetchone()[0]
             if version >= SCHEMA_VERSION:
                 return
+            # v2：FTS 更新触发器加 WHEN。旧库的 IF NOT EXISTS 不会替换已有触发器，
+            # 必须先删再重建，否则 access_count 更新仍会触发整行重索引。
+            if version < 2:
+                self.conn.execute("DROP TRIGGER IF EXISTS trg_items_fts_upd")
             self.conn.executescript(_SCHEMA_SQL)
+            self.conn.execute(
+                "INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)",
+                (str(SCHEMA_VERSION),),
+            )
             self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
             self.conn.commit()
 

@@ -13,6 +13,13 @@ export function historyToEntries(
       if (text) out.push({ id: nextId(), kind: "user", text });
       continue;
     }
+    if (item.kind === "thinking") {
+      const text = item.text || "";
+      if (text.trim()) {
+        out.push({ id: nextId(), kind: "thinking", text, done: true });
+      }
+      continue;
+    }
     if (item.kind === "assistant") {
       const raw = item.text || "";
       const text = cleanAssistant(raw).trim();

@@ -54,6 +54,73 @@ class ConsumeTests(unittest.TestCase):
         self.assertEqual(sum(1 for e in events if e.get("next") == "hello"), 1)
         self.assertFalse(any(e.get("kind") == "assistant" for e in events))
 
+    def test_delta_events_are_batched(self):
+        text = "x" * 200
+        chunks = [("messages", (AIMessageChunk(content=ch), {})) for ch in text]
+        chunks.append(("updates", {"agent": {"messages": [AIMessage(content=text)]}}))
+        events = self.run_consume(chunks)
+        deltas = [e for e in events if e.get("kind") == "delta_token"]
+        self.assertLessEqual(len(deltas), 10, len(deltas))
+        self.assertEqual("".join(e.get("next", "") for e in deltas), text)
+        self.assertFalse(any(e.get("kind") == "assistant" for e in events))
+
+    def test_batched_tokens_flush_before_tool_call(self):
+        text = "y" * 120
+        chunks = [("messages", (AIMessageChunk(content=ch), {})) for ch in text]
+        chunks.append(("updates", {"agent": {"messages": [AIMessage(
+            content=text,
+            tool_calls=[{"name": "code_run", "args": {}, "id": "c1"}],
+        )]}}))
+        events = self.run_consume(chunks)
+        kinds = [e.get("kind") for e in events]
+        self.assertIn("delta_token", kinds)
+        self.assertIn("tool_call", kinds)
+        self.assertLess(kinds.index("delta_token"), kinds.index("tool_call"))
+        self.assertEqual("".join(e.get("next", "") for e in events
+                                 if e.get("kind") == "delta_token"), text)
+
+    def test_thinking_stream_not_duplicated_by_full_message(self):
+        chunks = [
+            ("messages", (AIMessageChunk(
+                content="", additional_kwargs={"reasoning_content": "think"}), {})),
+            ("messages", (AIMessageChunk(content="answer"), {})),
+            ("updates", {"agent": {"messages": [AIMessage(
+                content="answer", additional_kwargs={"reasoning_content": "think"})]}}),
+        ]
+        events = self.run_consume(chunks)
+        thinking = [e for e in events if e.get("kind") == "thinking_delta"]
+        self.assertEqual("".join(e.get("next", "") for e in thinking), "think")
+        self.assertEqual(sum(1 for e in events if e.get("next") == "answer"), 1)
+        self.assertFalse(any(e.get("kind") == "assistant" for e in events))
+
+    def test_thinking_full_message_fallback(self):
+        chunks = [
+            ("updates", {"agent": {"messages": [AIMessage(
+                content="answer", additional_kwargs={"reasoning_content": "think"})]}}),
+        ]
+        events = self.run_consume(chunks)
+        kinds = [e.get("kind") for e in events]
+        self.assertIn("thinking_delta", kinds)
+        self.assertIn("assistant", kinds)
+        self.assertLess(kinds.index("thinking_delta"), kinds.index("assistant"))
+        thinking = "".join(e.get("next", "") for e in events
+                           if e.get("kind") == "thinking_delta")
+        self.assertEqual(thinking, "think")
+
+    def test_thinking_flushes_before_tool_call(self):
+        chunks = [
+            ("messages", (AIMessageChunk(
+                content="", additional_kwargs={"reasoning_content": "think"}), {})),
+            ("updates", {"agent": {"messages": [AIMessage(
+                content="", additional_kwargs={"reasoning_content": "think"},
+                tool_calls=[{"name": "code_run", "args": {}, "id": "c1"}])]}}),
+        ]
+        events = self.run_consume(chunks)
+        kinds = [e.get("kind") for e in events]
+        self.assertIn("thinking_delta", kinds)
+        self.assertIn("tool_call", kinds)
+        self.assertLess(kinds.index("thinking_delta"), kinds.index("tool_call"))
+
     def test_full_message_emitted_when_no_token_stream(self):
         chunks = [
             ("updates", {"agent": {"messages": [AIMessage(content="fallback")]}}),

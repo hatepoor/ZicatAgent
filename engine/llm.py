@@ -26,6 +26,21 @@ def _kwargs(cfg: dict) -> dict:
     return kw
 
 
+def _build_openai(cfg: dict, callbacks=None):
+    return ChatOpenAI(**_kwargs(cfg), callbacks=callbacks)
+
+
+def _build_deepseek(cfg: dict, callbacks=None):
+    from .deepseek import DeepSeekChatModel
+    return DeepSeekChatModel(**_kwargs(cfg), callbacks=callbacks)
+
+
+_BUILDERS = {
+    "openai": _build_openai,
+    "deepseek": _build_deepseek,
+}
+
+
 def build_chat_model(tools_schema: list[dict] | None = None, callbacks=None, index: int = 0):
     """构造模型；index 选主模型（/model 热切换），其余配置作为 fallback。"""
     configs = settings.oai_configs()
@@ -35,7 +50,9 @@ def build_chat_model(tools_schema: list[dict] | None = None, callbacks=None, ind
     ordered = configs[index:] + configs[:index]        # 选中者为主，其余按原序跟随当 fallback
     models = []
     for cfg in ordered:
-        model = ChatOpenAI(**_kwargs(cfg), callbacks=callbacks)
+        provider = str(cfg.get("provider") or "openai").strip().lower()
+        builder = _BUILDERS.get(provider, _build_openai)
+        model = builder(cfg, callbacks)
         if tools_schema:
             model = model.bind_tools(tools_schema)
         models.append(model)

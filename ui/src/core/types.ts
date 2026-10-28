@@ -21,7 +21,7 @@ export type SessionItem = {
 };
 
 export type HistoryItem = {
-  kind: "user" | "assistant" | "tool";
+  kind: "user" | "assistant" | "thinking" | "tool";
   text?: string;
   name?: string;
   args?: string;
@@ -39,6 +39,9 @@ export type ModelConfig = {
   context_window?: string | number;
   max_tokens?: string | number;
   temperature?: string | number;
+  provider?: string;
+  reasoning_effort?: string;
+  reasoning_effort_options?: string[];
 };
 
 export type RpcEvent = {
@@ -110,6 +113,12 @@ export type Entry =
       done: boolean;
       summary?: string;
       raw?: string;
+    }
+  | {
+      id: number;
+      kind: "thinking";
+      text: string;
+      done: boolean;
     }
   | {
       id: number;

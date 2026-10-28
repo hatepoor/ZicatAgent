@@ -32,7 +32,11 @@ class MemoryTools:
     def store(self) -> Optional[MemoryStore]:
         if self._store is None and not self._error:
             try:
-                self._store = MemoryStore(Database(self.db_path, init=False))
+                # 已存在的库在首次打开时自动升级 schema；库缺失时保持只读降级，
+                # 不在这里凭空创建空库。
+                self._store = MemoryStore(
+                    Database(self.db_path, init=self.db_path.exists())
+                )
             except Exception as exc:  # noqa: BLE001 - 记忆库不可用时降级
                 self._error = f"记忆库不可用: {exc}"
         return self._store
@@ -45,17 +49,17 @@ class MemoryTools:
             if name == "memory_search":
                 items = store.search(args.get("query", ""), layer=args.get("layer") or None,
                                      limit=int(args.get("limit", 5)))
-                for item in items:
-                    store.touch(item.id, actor="agent", event="read")
+                store.touch_many([item.id for item in items], actor="agent", event="read")
                 return json.dumps([{"name": i.name, "layer": i.layer, "kind": i.kind,
                                     "summary": i.summary, "updated_at": i.updated_at}
                                    for i in items], ensure_ascii=False)
             if name == "memory_read":
-                item = store.read(args.get("name", ""), actor="agent")
-                if not item:
+                result = store.read_with_meta(args.get("name", ""), actor="agent")
+                if not result:
                     return json.dumps({"error": "未找到"}, ensure_ascii=False)
+                item, version = result
                 return json.dumps({"name": item.name, "layer": item.layer, "kind": item.kind,
-                                   "body": item.body, "version": store.version_count(item.id),
+                                   "body": item.body, "version": version,
                                    "updated_at": item.updated_at}, ensure_ascii=False)
             if name == "memory_write":
                 existing = store.get(args.get("name", ""))

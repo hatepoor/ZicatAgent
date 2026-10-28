@@ -2,15 +2,33 @@ import { UI_CONFIG } from "../../core/config";
 import { compactNumber } from "../../core/format";
 import type { ThemeState } from "../../core/types";
 import type { AgentSession } from "../../hooks/useAgentSession";
+import { useClock } from "../../hooks/useClock";
 import { StatusCell } from "../common/StatusCell";
 
  type Props = {
   session: AgentSession;
   theme: ThemeState;
-  now: Date;
 };
 
-export function StatusBar({ session, theme, now }: Props) {
+export function StatusBar({ session, theme }: Props) {
+  const now = useClock();
+  const active =
+    session.models[session.activeModel] ??
+    session.models.find((item) => item.model === session.model);
+  const effort = active?.reasoning_effort || "默认";
+  const provider = active?.provider || "openai";
+  const effortColor =
+    effort === "默认"
+      ? "var(--faint)"
+      : effort === "off"
+        ? "var(--dim)"
+        : effort === "low"
+          ? "var(--cyan)"
+          : effort === "medium"
+            ? "var(--green)"
+            : effort === "high"
+              ? "var(--yellow)"
+              : "var(--red)";
   const configured = Number(session.models[session.activeModel]?.context_window);
   const contextLimit =
     configured > 0 ? configured : UI_CONFIG.fallbackContextWindow;
@@ -34,6 +52,13 @@ export function StatusBar({ session, theme, now }: Props) {
       </StatusCell>
       <StatusCell>
         <span style={{ color: "var(--cyan)" }}>⬢</span> {session.model}
+      </StatusCell>
+      <StatusCell>
+        <span title={`接口: ${provider}；用 /effort 调整`}>
+          <span style={{ color: "var(--magenta)" }}>✦</span>{" "}
+          <span style={{ color: "var(--faint)" }}>思考</span>{" "}
+          <span style={{ color: effortColor }}>{effort}</span>
+        </span>
       </StatusCell>
       <StatusCell>
         <span style={{ color: "var(--yellow)" }}>◧</span> {theme.theme.label}

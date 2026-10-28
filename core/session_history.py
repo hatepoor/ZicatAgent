@@ -21,6 +21,7 @@ _INTERNAL = re.compile(
     re.IGNORECASE,
 )
 MAX_TEXT = 4000
+MAX_THINKING = 8000
 MAX_ARGS = 300
 MAX_PAYLOAD_STR = 8000
 
@@ -47,6 +48,15 @@ def _args_text(args) -> str:
     return text[:MAX_ARGS] + ("…" if len(text) > MAX_ARGS else "")
 
 
+def _reasoning_text(message) -> str:
+    extra = getattr(message, "additional_kwargs", {}) or {}
+    for key in ("reasoning_content", "reasoning"):
+        value = extra.get(key)
+        if isinstance(value, str) and value.strip():
+            return value[:MAX_THINKING]
+    return ""
+
+
 def load_history(thread_id: str, limit: int = 300) -> list[dict]:
     """返回按时间顺序排列的历史条目；异常时返回空列表。"""
     if not thread_id:
@@ -70,6 +80,9 @@ def load_history(thread_id: str, limit: int = 300) -> list[dict]:
             continue
 
         if isinstance(message, (AIMessage, AIMessageChunk)) or hasattr(message, "tool_calls"):
+            reasoning = _reasoning_text(message)
+            if reasoning:
+                items.append({"kind": "thinking", "text": reasoning})
             text = text_of(message)
             if text.strip():
                 items.append({"kind": "assistant", "text": text})

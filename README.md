@@ -39,7 +39,7 @@ cd ui; npm install; npm run build
 node ui/server.mjs           # → http://127.0.0.1:8765
 ```
 
-Web UI 支持 `/model` 查看和修改模型配置（Base URL、API Key、模型名、上下文、最大输出），以及 `/workspace <路径>` 切换工作空间。默认工作空间 `./temp`（不存在会创建），也可用 `--workspace` 覆盖。
+Web UI 支持 `/model` 查看和修改模型配置（Base URL、API Key、模型名、上下文、最大输出、接口类型），以及 `/workspace <路径>` 切换工作空间。默认工作空间 `./temp`（不存在会创建），也可用 `--workspace` 覆盖。`/effort` 打开思考强度选择页（← → 选择，Enter 确认）。
 
 ### 可选依赖：ripgrep
 
@@ -75,8 +75,8 @@ slash 命令与内核 `core/commands.py` 完全一致（透传内核，补全表
 ## Slash 命令
 
 `/help`、`/cost`、`/threads`、`/resume`、`/continue`、`/rewind`、`/memory`、`/plan`、
-`/review`、`/scheduler`、`/goal`、`/team`、`/autorun`、`/distill`、`/update`、`/exit`，
-以及会话管理 `/new` `/del`、模型切换 `/model`。
+`/review`、`/scheduler`、`/goal`、`/team`、`/autorun`、`/distill`、`/update`、`/exit`、
+`/effort`，以及会话管理 `/new` `/del`、模型切换 `/model`。
 普通文本直接作为任务发给 agent。
 
 **完整用法（含每个命令的详细说明、会话管理、记忆系统速览、常见问题）见

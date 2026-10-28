@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import ConfirmDialog from "./components/Confirm";
+import { EffortSelector } from "./components/EffortSelector";
 import HistorySidebar from "./components/History";
 import { Composer } from "./components/composer/Composer";
 import { ChatView } from "./components/layout/ChatView";
@@ -9,7 +10,6 @@ import { StatusBar } from "./components/layout/StatusBar";
 import { TopBar } from "./components/layout/TopBar";
 import { ModelSettings, WorkspaceSettings } from "./components/Settings";
 import { useAgentSession } from "./hooks/useAgentSession";
-import { useClock } from "./hooks/useClock";
 import { useComposer } from "./hooks/useComposer";
 import { useTheme } from "./hooks/useTheme";
 import type { Theme } from "./themes";
@@ -42,7 +42,6 @@ function themeVars(theme: Theme): CSSProperties {
  */
 export default function App() {
   const [panelOpen, setPanelOpen] = useState(true);
-  const now = useClock();
   const theme = useTheme();
   const session = useAgentSession({ onTheme: theme.next });
   const composer = useComposer({
@@ -130,7 +129,6 @@ export default function App() {
         <RightPanel
           session={session}
           theme={theme}
-          now={now}
           panelOpen={panelOpen}
           onFillCommand={composer.fillCommand}
         />
@@ -142,7 +140,7 @@ export default function App() {
         hasPendingQuestion={session.hasPendingQuestion}
         modalOpen={session.modal !== null}
       />
-      <StatusBar session={session} theme={theme} now={now} />
+      <StatusBar session={session} theme={theme} />
 
       {session.modal === "model" && (
         <ModelSettings
@@ -161,6 +159,15 @@ export default function App() {
           defaultPath={session.defaultWorkspace}
           onClose={session.closeModal}
           onSave={session.saveWorkspace}
+        />
+      )}
+
+      {session.modal === "effort" && (
+        <EffortSelector
+          models={session.models}
+          active={session.activeModel}
+          onClose={session.closeModal}
+          onConfirm={session.setEffort}
         />
       )}
       {session.pendingDelete && (

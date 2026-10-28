@@ -5,6 +5,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -251,6 +252,94 @@ class MemoryToolsTests(unittest.TestCase):
         archived = json.loads(self.box.dispatch("memory_archive", {"name": "demo_sop"}))
         self.assertTrue(archived.get("ok"), archived)
         self.assertNotIn("demo_sop —", self.box.dispatch("memory_index", {}))
+
+    def test_search_uses_single_touch_many(self):
+        self.box.dispatch("memory_write", {
+            "name": "batch_sop", "layer": "L3", "kind": "sop",
+            "title": "batch", "summary": "批量命中", "body": "批量命中测试正文",
+        })
+        store = self.box.store
+        with patch.object(store, "touch_many", wraps=store.touch_many) as many, \
+                patch.object(store, "touch", wraps=store.touch) as one:
+            hits = json.loads(self.box.dispatch("memory_search", {"query": "批量"}))
+        self.assertTrue(hits, hits)
+        self.assertEqual(many.call_count, 1)
+        self.assertEqual(one.call_count, 0)
+
+    def test_touch_many_single_transaction(self):
+        for name in ("touch_a", "touch_b"):
+            self.box.dispatch("memory_write", {
+                "name": name, "layer": "L2", "kind": "fact",
+                "title": name, "summary": name, "body": name,
+            })
+        store = self.box.store
+        ids = [store.get("touch_a").id, store.get("touch_b").id]
+        statements = []
+        store.conn.set_trace_callback(statements.append)
+        try:
+            store.touch_many(ids)
+        finally:
+            store.conn.set_trace_callback(None)
+        updates = [s for s in statements if s.lstrip().upper().startswith("UPDATE")]
+        begins = [s for s in statements if "BEGIN IMMEDIATE" in s.upper()]
+        # SQLite 的 trace 可能按行重复上报同一条 UPDATE；关键是只有一条语句、一个事务。
+        self.assertEqual(len(set(updates)), 1, statements)
+        self.assertEqual(len(begins), 1, statements)
+        self.assertEqual(
+            sum(1 for s in statements if s.lstrip().upper().startswith("INSERT INTO MEMORY_EVENTS")),
+            2,
+            statements,
+        )
+
+    def test_fts_trigger_skips_access_count_update(self):
+        self.box.dispatch("memory_write", {
+            "name": "fts_skip", "layer": "L3", "kind": "sop",
+            "title": "fts", "summary": "索引跳过", "body": "索引跳过测试正文",
+        })
+        store = self.box.store
+        trigger = store.conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='trigger' AND name='trg_items_fts_upd'"
+        ).fetchone()[0]
+        self.assertIn("WHEN old.name IS NOT new.name", trigger)
+        statements = []
+        store.conn.set_trace_callback(statements.append)
+        try:
+            store.conn.execute(
+                "UPDATE memory_items SET access_count = access_count + 1 WHERE name = 'fts_skip'"
+            )
+        finally:
+            store.conn.set_trace_callback(None)
+        self.assertFalse(
+            any("memory_fts" in s.lower() for s in statements),
+            statements,
+        )
+
+    def test_schema_migrates_v1_fts_trigger(self):
+        from memstore.db import Database
+        path = _tmp_path("migrate.db")
+        _clean(path)
+        Database(path).close()
+        conn = sqlite3.connect(path)
+        conn.execute("DROP TRIGGER trg_items_fts_upd")
+        conn.execute(
+            "CREATE TRIGGER trg_items_fts_upd AFTER UPDATE ON memory_items BEGIN "
+            "INSERT INTO memory_fts(memory_fts, rowid, name, title, summary, body) "
+            "VALUES ('delete', old.rowid, old.name, old.title, old.summary, old.body); "
+            "INSERT INTO memory_fts(rowid, name, title, summary, body) "
+            "VALUES (new.rowid, new.name, new.title, new.summary, new.body); END"
+        )
+        conn.execute("PRAGMA user_version = 1")
+        conn.commit()
+        conn.close()
+        Database(path).close()
+        conn = sqlite3.connect(path)
+        sql = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='trigger' AND name='trg_items_fts_upd'"
+        ).fetchone()[0]
+        version = conn.execute("PRAGMA user_version").fetchone()[0]
+        conn.close()
+        self.assertIn("WHEN old.name IS NOT new.name", sql)
+        self.assertEqual(version, 2)
 
     def test_link_tool(self):
         self.box.dispatch("memory_write", {"name": "a", "layer": "L2", "kind": "fact",
@@ -1165,7 +1254,7 @@ class DualStreamTests(unittest.TestCase):
             items.append(q.get_nowait())
         tokens = [i["next"] for i in items if i.get("kind") == "delta_token"]
         assistants = [i["next"] for i in items if i.get("kind") == "assistant"]
-        self.assertEqual(tokens, ["答案 42", " 完毕"])            # token 增量逐条
+        self.assertEqual("".join(tokens), "答案 42 完毕")          # 合批后内容与顺序不变
         self.assertEqual(assistants, ["第二轮新内容"])              # 已流正文不重复；新内容照发
 
     def test_internal_node_messages_are_not_streamed(self):

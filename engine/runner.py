@@ -76,6 +76,51 @@ def _args_summary(args, limit: int = 200) -> str:
     return text
 
 
+def _reasoning_of(message) -> str:
+    """取流式/非流式消息里的思考内容；兼容 DeepSeek 与 OpenRouter 风格。"""
+    extra = getattr(message, "additional_kwargs", {}) or {}
+    for key in ("reasoning_content", "reasoning"):
+        value = extra.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return ""
+
+
+class _DeltaBatcher:
+    """把逐 token 的 delta 合并成小批，降低 RPC/SSE 事件数。
+
+    80 字符或 40ms 先到先发；结构化事件（tool_call/tool_result）前必须
+    flush，保证前端看到的 token 顺序与事件顺序一致。
+    """
+
+    def __init__(self, display_queue, source: str, min_chars: int = 80,
+                 max_interval: float = 0.04, kind: str = "delta_token"):
+        self.queue = display_queue
+        self.source = source
+        self.min_chars = max(1, int(min_chars))
+        self.max_interval = max(0.0, float(max_interval))
+        self.kind = kind
+        self.parts: list[str] = []
+        self.size = 0
+        self.last = time.monotonic()
+
+    def push(self, text: str) -> None:
+        if not text:
+            return
+        self.parts.append(text)
+        self.size += len(text)
+        if self.size >= self.min_chars or (time.monotonic() - self.last) >= self.max_interval:
+            self.flush()
+
+    def flush(self) -> None:
+        if not self.parts:
+            return
+        _emit(self.queue, "".join(self.parts), self.source, kind=self.kind)
+        self.parts.clear()
+        self.size = 0
+        self.last = time.monotonic()
+
+
 def _cfg_float(cfg: dict, key: str, default: float) -> float:
     try:
         return float(cfg.get(key, default))
@@ -219,7 +264,10 @@ def _consume(graph, inputs, config, runtime, tracker, display_queue, source, han
     pending: list = []
     while True:
         kwargs = {"durability": durability} if durability else {}
-        tok_buf = {"text": ""}  # 本轮 token 流累计（updates 的整段与它重复，需去重）
+        content_batcher = _DeltaBatcher(display_queue, source, kind="delta_token")
+        thinking_batcher = _DeltaBatcher(display_queue, source, kind="thinking_delta")
+        tok_seen = False
+        thinking_seen = False
         for mode, chunk in graph.stream(inputs, config,
                                         stream_mode=["messages", "updates"], **kwargs):
             if _stop_requested(runtime.agent):
@@ -229,24 +277,37 @@ def _consume(graph, inputs, config, runtime, tracker, display_queue, source, han
                 # messages 流不只包含模型 token：节点返回的 HumanMessage（轮末
                 # <global_memory> 提示）和 ToolMessage（工具结果）也会被推流。
                 # 只有 AIMessage 才是模型产出，其余一律不进助手正文。
-                delta = getattr(msg, "content", None) if isinstance(msg, AIMessage) else None
-                if isinstance(delta, str) and delta:
-                    tok_buf["text"] += delta
-                    _emit(display_queue, delta, source, kind="delta_token")
+                if isinstance(msg, AIMessage):
+                    reasoning = _reasoning_of(msg)
+                    if reasoning:
+                        thinking_seen = True
+                        thinking_batcher.push(reasoning)
+                    delta = getattr(msg, "content", None)
+                    if isinstance(delta, str) and delta:
+                        tok_seen = True
+                        content_batcher.push(delta)
                 continue
             if not isinstance(chunk, dict):
                 continue
+            # 结构化事件前先落盘 thinking / token，保持顺序。
+            thinking_batcher.flush()
+            content_batcher.flush()
             for _node, update in chunk.items():
                 if not isinstance(update, dict):
                     continue
                 for message in update.get("messages") or []:
                     if isinstance(message, AIMessage):
+                        reasoning = _reasoning_of(message)
+                        if reasoning and not thinking_seen:
+                            # 非流式 / messages 流未带 reasoning 时，用整段补发一次。
+                            _emit(display_queue, reasoning, source, kind="thinking_delta")
+                        thinking_seen = False
                         text = text_of(message)
-                        if text and not tok_buf["text"]:
-                            # token 流已发出本轮正文时不再重复整段；缓冲无论是否有
-                            # 文本都要清空，避免上一条工具调用轮的 token 串到下一轮。
+                        if text and not tok_seen:
+                            # token 流已发出本轮正文时不再重复整段；tok_seen 无论
+                            # 是否有文本都要复位，避免上一条工具调用轮的 token 串到下一轮。
                             _emit(display_queue, text, source, kind="assistant")
-                        tok_buf["text"] = ""
+                        tok_seen = False
                         for call in getattr(message, "tool_calls", None) or []:
                             name = str(call.get("name") or "")
                             _emit(display_queue, f"\n🛠️ {name}\n", source,
@@ -291,6 +352,8 @@ def _consume(graph, inputs, config, runtime, tracker, display_queue, source, han
                               payload=payload,
                               ok=getattr(message, "status", "success") != "error")
 
+        thinking_batcher.flush()
+        content_batcher.flush()
         snapshot = graph.get_state(config)
         pending = list(getattr(snapshot, "interrupts", ()) or ())
         if not pending:

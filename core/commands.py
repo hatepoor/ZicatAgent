@@ -26,7 +26,8 @@ HELP = """zicatAgent 命令
   /plan                    查看当前计划进度
   /plan <plan.md>          绑定计划文件（支持绝对/相对路径）
   /model [N]               查看模型详情/切换模型（N=序号，1 起）
-  /model set <N> k=v ...   修改模型配置（base_url/api_key/model/name/context_window/max_tokens/temperature）
+  /model set <N> k=v ...   修改模型配置（base_url/api_key/model/name/context_window/max_tokens/temperature/provider/reasoning_effort）
+  /effort [level]          查看/设置当前模型思考强度（off/low/medium/high/xhigh/max）
   /workspace [路径]        查看或切换工作空间（默认 当前目录/temp）
   /cost                    查看 graph 引擎 token 用量与上下文配置
   /scheduler               列出可自启动的 reflect 服务与定时任务
@@ -78,6 +79,8 @@ def _cmd_model(agent, rest: str, emit: Emit) -> None:
             emit(f"      上下文  : {c.get('context_window') or '—'} | "
                  f"最大输出: {c.get('max_tokens') or '—'} | "
                  f"temperature: {c.get('temperature') if c.get('temperature') != '' else '—'}")
+            emit(f"      接口    : {c.get('provider') or 'openai'} | "
+                 f"思考强度: {c.get('reasoning_effort') or '未设置'}")
         emit("  修改：/model set <序号> base_url=... api_key=... model=... "
              "context_window=... max_tokens=...")
         return
@@ -99,6 +102,8 @@ def _cmd_model(agent, rest: str, emit: Emit) -> None:
             "context": "context_window", "context_window": "context_window",
             "max_tokens": "max_tokens", "max_output": "max_tokens", "max": "max_tokens",
             "temperature": "temperature", "temp": "temperature",
+            "provider": "provider", "interface": "provider",
+            "reasoning_effort": "reasoning_effort", "effort": "reasoning_effort",
         }
         values = {}
         for item in parts[2:]:
@@ -128,6 +133,40 @@ def _cmd_model(agent, rest: str, emit: Emit) -> None:
     set_llm_no(agent, n)
     c = models[n]
     emit(f"模型已切换 → [{n + 1}] {c.get('name') or c.get('model')}（下个任务生效）")
+
+
+def _cmd_effort(agent, rest: str, emit: Emit) -> None:
+    """/effort：查看或设置当前模型的思考强度。"""
+    from core.model_config import REASONING_EFFORT_OPTIONS, list_models, save_model
+    from engine.runner import _load_llm_no
+
+    models = list_models()
+    if not models:
+        emit("没有可用的模型配置")
+        return
+    index = max(0, min(int(_load_llm_no(agent) or 0), len(models) - 1))
+    current = models[index]
+    provider = str(current.get("provider") or "openai")
+    levels = REASONING_EFFORT_OPTIONS.get(provider, [])
+    value = (rest or "").strip().lower()
+
+    if not value:
+        emit(f"当前模型 [{index + 1}] {current.get('name') or current.get('model') or '?'}")
+        emit(f"接口: {provider}")
+        emit(f"思考强度: {current.get('reasoning_effort') or '未设置'}")
+        if levels:
+            emit("可选: " + " / ".join(levels))
+        return
+
+    if value not in levels:
+        emit(f"用法: /effort {'|'.join(levels) or '<当前接口无可用档位>'}")
+        return
+    try:
+        save_model(index, {"reasoning_effort": value})
+    except Exception as exc:  # noqa: BLE001 - 命令失败回显给用户
+        emit(f"保存失败: {exc}")
+        return
+    emit(f"✅ 模型 [{index + 1}] 思考强度 → {value}（下个任务生效）")
 
 
 def _cmd_workspace(agent, rest: str, emit: Emit) -> None:
@@ -315,27 +354,29 @@ def _cmd_memory(args: str, emit: Emit) -> None:
     rest = parts[1].strip() if len(parts) > 1 else ""
     db_path = graph_settings.graph_config().get("memory_db")
     try:
-        store = MemoryStore(Database(db_path, init=False))
+        db = Database(db_path, init=True)
     except Exception as exc:  # noqa: BLE001 - 记忆库缺失时给出可读提示
         emit(f"记忆库不可用: {exc}")
         return
-    if sub == "search":
-        if not rest:
-            emit("用法: /memory search <关键词>")
+    with db:
+        store = MemoryStore(db)
+        if sub == "search":
+            if not rest:
+                emit("用法: /memory search <关键词>")
+                return
+            hits = store.search(rest, limit=8)
+            if not hits:
+                emit("没有命中。")
+                return
+            lines = [f"## 记忆检索: {rest}"]
+            for item in hits:
+                lines.append(f"  [{item.layer}/{item.kind}] {item.name} — {item.summary}")
+            emit("\n".join(lines))
             return
-        hits = store.search(rest, limit=8)
-        if not hits:
-            emit("没有命中。")
+        if sub in ("", "index"):
+            emit(store.render_l1(log=False))
             return
-        lines = [f"## 记忆检索: {rest}"]
-        for item in hits:
-            lines.append(f"  [{item.layer}/{item.kind}] {item.name} — {item.summary}")
-        emit("\n".join(lines))
-        return
-    if sub in ("", "index"):
-        emit(store.render_l1(log=False))
-        return
-    emit("用法: /memory index | /memory search <关键词>")
+        emit("用法: /memory index | /memory search <关键词>")
 
 
 def _cmd_resume(agent, arg: str, emit: Emit) -> None:
@@ -437,6 +478,9 @@ def handle(agent, raw_query: str, emit: Emit = print) -> Optional[str]:
         return None
     if cmd == "/model":
         _cmd_model(agent, rest, emit)
+        return None
+    if cmd == "/effort":
+        _cmd_effort(agent, rest, emit)
         return None
     if cmd == "/workspace":
         _cmd_workspace(agent, rest, emit)

@@ -1,9 +1,11 @@
+import { memo } from "react";
 import type { Entry } from "../../core/types";
 import { AssistantBlock } from "./AssistantBlock";
 import { InterruptBlock } from "./InterruptBlock";
+import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolBlock } from "./ToolBlock";
 
-export function EntryView({
+function EntryViewInner({
   entry,
   onPickCandidate,
 }: {
@@ -27,6 +29,8 @@ export function EntryView({
       );
     case "assistant":
       return <AssistantBlock entry={entry} />;
+    case "thinking":
+      return <ThinkingBlock entry={entry} />;
     case "tool":
       return <ToolBlock entry={entry} />;
     case "system":
@@ -53,3 +57,5 @@ export function EntryView({
       );
   }
 }
+
+export const EntryView = memo(EntryViewInner);

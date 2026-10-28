@@ -1,13 +1,14 @@
+import { useMemo } from "react";
 import { KEYBOARD_SHORTCUTS, UI_CONFIG } from "../../core/config";
 import { formatDuration } from "../../core/format";
 import type { ThemeState } from "../../core/types";
 import type { AgentSession } from "../../hooks/useAgentSession";
+import { useClock } from "../../hooks/useClock";
 import { PanelRow, PanelSection } from "../common/Panel";
 
 type Props = {
   session: AgentSession;
   theme: ThemeState;
-  now: Date;
   panelOpen: boolean;
   onFillCommand: (command: string) => void;
 };
@@ -15,15 +16,24 @@ type Props = {
 export function RightPanel({
   session,
   theme,
-  now,
   panelOpen,
   onFillCommand,
 }: Props) {
-  const msgCount = session.entries.filter((entry) => entry.kind === "user").length;
-  const toolCount = session.entries.filter((entry) => entry.kind === "tool").length;
-  const recentTools = session.entries
-    .filter((entry) => entry.kind === "tool")
-    .slice(-UI_CONFIG.maxRecentTools);
+  const now = useClock();
+  const msgCount = useMemo(
+    () => session.entries.filter((entry) => entry.kind === "user").length,
+    [session.entries],
+  );
+  const toolCount = useMemo(
+    () => session.entries.filter((entry) => entry.kind === "tool").length,
+    [session.entries],
+  );
+  const recentTools = useMemo(
+    () => session.entries
+      .filter((entry) => entry.kind === "tool")
+      .slice(-UI_CONFIG.maxRecentTools),
+    [session.entries],
+  );
   const uptime = Math.max(0, Math.floor((now.getTime() - session.startedAt) / 1000));
   const configured = Number(session.models[session.activeModel]?.context_window);
   const contextLimit =

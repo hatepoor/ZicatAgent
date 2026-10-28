@@ -1,7 +1,7 @@
 # v0.1.1 开发进度
 
 > 对应架构版本: v1
-> 最后更新: 2026-10-26
+> 最后更新: 2026-10-28
 
 ## 本版目标
 
@@ -19,8 +19,16 @@ Web TUI 前端：把 `terminal-zizicat-tui/` 的视觉设计参考落成真实�
 | 05 | [功能补全](./05-功能补全/todolist.md) | 🔧 | 03 | A 组 5 项完成（沙箱/model/归档/英文/FIX-S）；B 组额度项与 C 组暂缓项见 todolist |
 | 06 | 文件工具增强 | ✅ | 05 | grep/glob/file_apply_patch + 原子写/编码/路径边界；96 tests OK |
 | 07 | 会话/模型/工作空间/渲染 | ✅ | 06 | /new 真新建、左侧历史、summary、模型/工作空间、Markdown+LaTeX、工具折叠、上下文统计、会话/工作区删除；116 tests OK |
+| 08 | [运行性能与思考模式](./08-运行性能与思考模式/00-诊断与修复计划.md) | 🔧 | 07 | CPU+memory、`/effort` 选择页、DeepSeek 接口、thinking 折叠/历史回放已完成；待真实 UI 验收 |
 
 ## 进度日志
+
+### 2026-10-28
+- 📝 08/运行性能与思考模式诊断：定位 memory 写放大（FTS 触发器无 WHEN、每条命中一个写事务、L1 连接泄漏）、CPU 高（前端逐 token 重渲染 + 1Hz 整树刷新 + 后端逐 token 转发/checkpoint）、/effort 与 thinking 缺口（配置白名单缺失、langchain_openai 丢弃 reasoning_content、RPC/UI 无 thinking 协议）；已确认 /effort 档位 off/low/medium/high/max、thinking 实时+历史回放、本轮先 CPU+memory；见 `08-运行性能与思考模式/00-诊断与修复计划.md`。
+- ✅ 08/CPU + memory 修复：FTS 更新触发器加 `WHEN` + schema v2（access_count 更新不再重建索引）；`touch_many` 单事务、`read_with_meta`、L1 单例、`/memory` 关闭连接；前端 delta 50ms 合批、时钟移入 StatusBar/RightPanel、Rich/EntryView memo；后端 `_DeltaBatcher` 80 字符/40ms 合批并移除 `tok_buf` 全量拼接。memory_read p50 2.35ms→0.14ms；131 tests OK；`ui` build OK。`memstore.verify` 仍有 6 项迁移前已有漂移（facts/l1_rules + 2 个 manifest 外条目），非本轮引入。
+- 🔎 渠道探测：`deepseek/deepseek-v4.1-flash` 非流式/流式均返回 `reasoning_content`；合法 effort=`off/low/medium/high/xhigh/max`，`none`/`minimal` 400；`off` 直接发送即可。`/effort` + thinking UI 留待下一轮。
+- ✅ 08/`/effort` 选择页 + DeepSeek 接口：`.env` 新增 `PROVIDER`/`REASONING_EFFORT`；`/mode` 可选 OpenAI Chat Completions / DeepSeek；`/effort` 页面 ←→ 选择、Enter 确认、Esc 取消、当前值高亮；`engine/deepseek.py` 用 `ChatDeepSeek` + tools 场景 reasoning 回传；138 tests OK，`ui` build OK；实测代理流式 reasoning + 两轮工具回传 200。
+- ✅ 08/thinking 展示：runner 从 `additional_kwargs.reasoning_content` 发 `thinking_delta`（兼容 OpenRouter `reasoning`，`thinking_seen` 去重）；RPC 映射 `thinking`；前端 `ThinkingBlock` 默认折叠、`.tui-shimmer` 呼吸、`delta/tool_call/done` 切块；`session_history` + `history.ts` 支持 checkpoint 历史回放。144 tests OK，`ui` build OK。真实 UI 验证：DeepSeek + `code_run` 任务，thinking 块出现在工具调用前，展开可见推理文本，状态栏同步 `思考 high`。
 
 ### 2026-10-26
 - 📐 架构图重绘：`assets/diagrams/agent_loop_v2.drawio`（接入/运行入口 → 会话与系统提示 → prepare→agent⇄tools/human/check→finalize → 状态/检查点 + 能力层；含 Web TUI/RPC、abort 回退、双流事件）与 `assets/diagrams/memory_arch_v2.drawio`（L0–L4、运行时读写、文件↔库运维、目录门牌）；两张 PNG 已导出到 `assets/diagrams/`；旧 v1 两图已删除；结构校验 0 错误。

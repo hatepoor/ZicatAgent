@@ -57,6 +57,48 @@ class ModelConfigTests(unittest.TestCase):
         self.assertIn("ZICAT_OAI_1__MAX_TOKENS=8192", text)
         self.assertIn("ZICAT_OAI_1__APIKEY=secret-key", text)
 
+    def test_provider_and_effort_roundtrip(self):
+        self.write_env(
+            "ZICAT_OAI_1__APIBASE=https://a\n"
+            "ZICAT_OAI_1__MODEL=m1\n"
+        )
+        models = save_model(0, {
+            "provider": "deepseek",
+            "reasoning_effort": "medium",
+        }, env_path=self.env)
+        self.assertEqual(models[0]["provider"], "deepseek")
+        self.assertEqual(models[0]["reasoning_effort"], "medium")
+        self.assertIn("xhigh", models[0]["reasoning_effort_options"])
+        with open(self.env, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("ZICAT_OAI_1__PROVIDER=deepseek", text)
+        self.assertIn("ZICAT_OAI_1__REASONING_EFFORT=medium", text)
+
+    def test_provider_switch_drops_incompatible_effort(self):
+        self.write_env(
+            "ZICAT_OAI_1__APIBASE=https://a\n"
+            "ZICAT_OAI_1__MODEL=m1\n"
+            "ZICAT_OAI_1__PROVIDER=deepseek\n"
+            "ZICAT_OAI_1__REASONING_EFFORT=max\n"
+        )
+        models = save_model(0, {"provider": "openai"}, env_path=self.env)
+        self.assertEqual(models[0]["provider"], "openai")
+        self.assertEqual(models[0]["reasoning_effort"], "")
+        with open(self.env, encoding="utf-8") as f:
+            text = f.read()
+        self.assertNotIn("REASONING_EFFORT", text)
+
+    def test_invalid_provider_and_effort_rejected(self):
+        self.write_env(
+            "ZICAT_OAI_1__APIBASE=https://a\n"
+            "ZICAT_OAI_1__MODEL=m1\n"
+        )
+        with self.assertRaises(ValueError):
+            save_model(0, {"provider": "unknown"}, env_path=self.env)
+        with self.assertRaises(ValueError):
+            save_model(0, {"provider": "openai", "reasoning_effort": "max"},
+                       env_path=self.env)
+
     def test_masked_key_not_written(self):
         self.write_env(
             "ZICAT_OAI_1__APIBASE=https://a\n"

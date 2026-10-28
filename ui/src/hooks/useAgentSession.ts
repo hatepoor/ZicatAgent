@@ -32,7 +32,7 @@ export function useAgentSession(options: Options = {}) {
   const [defaultWorkspace, setDefaultWorkspace] = useState("");
   const [models, setModels] = useState<ModelConfig[]>([]);
   const [activeModel, setActiveModel] = useState(0);
-  const [modal, setModal] = useState<"model" | "workspace" | null>(null);
+  const [modal, setModal] = useState<"model" | "workspace" | "effort" | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [workspaces, setWorkspaces] = useState<string[]>([]);
@@ -46,6 +46,7 @@ export function useAgentSession(options: Options = {}) {
   const idRef = useRef(0);
   const nextId = useCallback(() => ++idRef.current, []);
   const openAssistant = useRef<number | null>(null);
+  const openThinking = useRef<number | null>(null);
   const openTools = useRef<{ id: number; name: string; callId?: string; t0: number }[]>([]);
   const assistantHadText = useRef(false);
   const lastWasSlash = useRef(false);
@@ -53,6 +54,9 @@ export function useAgentSession(options: Options = {}) {
   const exitedRef = useRef(false);
   const esRef = useRef<EventSource | null>(null);
   const entriesRef = useRef(0);
+  const deltaBuffer = useRef("");
+  const deltaTarget = useRef<number | null>(null);
+  const deltaTimer = useRef<number | null>(null);
 
   useEffect(() => {
     entriesRef.current = entries.length;
@@ -62,6 +66,10 @@ export function useAgentSession(options: Options = {}) {
     busyRef.current = busy;
   }, [busy]);
 
+  useEffect(() => () => {
+    if (deltaTimer.current != null) window.clearTimeout(deltaTimer.current);
+  }, []);
+
   const push = useCallback((entry: Entry) => {
     setEntries((prev) => [...prev, entry]);
   }, []);
@@ -70,17 +78,64 @@ export function useAgentSession(options: Options = {}) {
     setEntries((prev) => prev.map((entry) => (entry.id === id ? fn(entry) : entry)));
   }, []);
 
+  const flushDelta = useCallback(() => {
+    if (deltaTimer.current != null) {
+      window.clearTimeout(deltaTimer.current);
+      deltaTimer.current = null;
+    }
+    const chunk = deltaBuffer.current;
+    const id = deltaTarget.current;
+    deltaBuffer.current = "";
+    deltaTarget.current = null;
+    if (!chunk || id == null) return;
+    patch(id, (entry) => {
+      if (entry.kind !== "assistant") return entry;
+      const raw = (entry.raw || "") + chunk;
+      const text = cleanAssistant(raw);
+      if (text) assistantHadText.current = true;
+      const summary = raw.includes("<summary>") ? extractSummary(raw) : entry.summary;
+      return { ...entry, raw, text, summary };
+    });
+  }, [patch]);
+
+  const queueDelta = useCallback((chunk: string) => {
+    const id = openAssistant.current;
+    if (id == null) return;
+    deltaBuffer.current += chunk;
+    deltaTarget.current = id;
+    if (deltaTimer.current == null) {
+      // 50ms 合批：把每 token 一次的状态更新降到每秒约 20 次。
+      deltaTimer.current = window.setTimeout(flushDelta, 50);
+    }
+  }, [flushDelta]);
+
   const closeAssistant = useCallback(() => {
+    flushDelta();
     const id = openAssistant.current;
     if (id != null) {
       patch(id, (entry) => (entry.kind === "assistant" ? { ...entry, done: true } : entry));
       openAssistant.current = null;
     }
+  }, [flushDelta, patch]);
+
+  const closeThinking = useCallback(() => {
+    const id = openThinking.current;
+    if (id != null) {
+      patch(id, (entry) => (entry.kind === "thinking" ? { ...entry, done: true } : entry));
+      openThinking.current = null;
+    }
   }, [patch]);
 
   const clearChat = useCallback(() => {
+    if (deltaTimer.current != null) {
+      window.clearTimeout(deltaTimer.current);
+      deltaTimer.current = null;
+    }
+    deltaBuffer.current = "";
+    deltaTarget.current = null;
     setEntries([]);
     openAssistant.current = null;
+    openThinking.current = null;
     openTools.current = [];
     assistantHadText.current = false;
   }, []);
@@ -95,9 +150,10 @@ export function useAgentSession(options: Options = {}) {
 
   const doAbort = useCallback(() => {
     if (!busyRef.current) return;
+    closeThinking();
     closeAssistant();
     void send({ type: "abort" }).catch(() => undefined);
-  }, [closeAssistant]);
+  }, [closeAssistant, closeThinking]);
 
   const pushSystem = useCallback(
     (text: string) => push({ id: nextId(), kind: "system", text }),
@@ -199,18 +255,26 @@ export function useAgentSession(options: Options = {}) {
           }
           if (event.default_workspace) setDefaultWorkspace(event.default_workspace);
           break;
+        case "thinking": {
+          const chunk = event.text || "";
+          if (!chunk) break;
+          const id = openThinking.current;
+          if (id != null) {
+            patch(id, (entry) =>
+              entry.kind === "thinking" ? { ...entry, text: entry.text + chunk } : entry,
+            );
+          } else {
+            const nid = nextId();
+            openThinking.current = nid;
+            push({ id: nid, kind: "thinking", text: chunk, done: false });
+          }
+          break;
+        }
         case "delta": {
           const chunk = event.text || "";
           if (!chunk) break;
-          const id = openAssistant.current;
-          if (id != null) {
-            patch(id, (entry) => {
-              if (entry.kind !== "assistant") return entry;
-              const raw = (entry.raw || "") + chunk;
-              const text = cleanAssistant(raw);
-              if (text) assistantHadText.current = true;
-              return { ...entry, raw, text, summary: extractSummary(raw) || entry.summary };
-            });
+          if (openAssistant.current != null) {
+            queueDelta(chunk);
           } else {
             const text = cleanAssistant(chunk);
             if (text) assistantHadText.current = true;
@@ -223,12 +287,13 @@ export function useAgentSession(options: Options = {}) {
               shown: 0,
               done: false,
               raw: chunk,
-              summary: extractSummary(chunk),
+              summary: chunk.includes("<summary>") ? extractSummary(chunk) : "",
             });
           }
           break;
         }
         case "tool_call": {
+          closeThinking();
           closeAssistant();
           const nid = nextId();
           openTools.current.push({
@@ -277,10 +342,12 @@ export function useAgentSession(options: Options = {}) {
           break;
         }
         case "notice":
+          closeThinking();
           closeAssistant();
           pushSystem(stripInternal(event.text || ""));
           break;
         case "interrupt":
+          closeThinking();
           closeAssistant();
           push({
             id: nextId(),
@@ -290,6 +357,7 @@ export function useAgentSession(options: Options = {}) {
           });
           break;
         case "done": {
+          closeThinking();
           closeAssistant();
           for (const tool of openTools.current) {
             patch(tool.id, (entry) =>
@@ -342,6 +410,7 @@ export function useAgentSession(options: Options = {}) {
         case "exit":
           if (exitedRef.current) break;
           exitedRef.current = true;
+          closeThinking();
           closeAssistant();
           setConnected(false);
           setBusy(false);
@@ -350,7 +419,7 @@ export function useAgentSession(options: Options = {}) {
           break;
       }
     },
-    [closeAssistant, nextId, patch, push, pushSystem, resetUi],
+    [closeAssistant, closeThinking, nextId, patch, push, pushSystem, queueDelta, resetUi],
   );
 
   useEffect(() => {
@@ -396,6 +465,12 @@ export function useAgentSession(options: Options = {}) {
         });
         return;
       }
+      if (cmd === "/effort" && !rest) {
+        push({ id: nextId(), kind: "user", text });
+        setModal("effort");
+        void send({ type: "get_models" }).catch(() => undefined);
+        return;
+      }
       if (cmd === "/model" || cmd === "/mode") {
         if (!rest) {
           push({ id: nextId(), kind: "user", text });
@@ -433,6 +508,7 @@ export function useAgentSession(options: Options = {}) {
       lastWasSlash.current = text.startsWith("/");
       assistantHadText.current = false;
       openAssistant.current = null;
+      openThinking.current = null;
       openTools.current = [];
       setStartedAt(Date.now());
       setBusy(true);
@@ -460,6 +536,17 @@ export function useAgentSession(options: Options = {}) {
       pushSystem(`读取模型配置失败: ${err.message}`);
     });
   }, [pushSystem]);
+
+  const setEffort = useCallback(
+    (value: string) => {
+      const index = activeModel;
+      setModal(null);
+      pushSystem(`思考强度 → ${value}（下个任务生效）`);
+      void send({ type: "save_model", index, config: { reasoning_effort: value } })
+        .catch((err: Error) => pushSystem(`保存思考强度失败: ${err.message}`));
+    },
+    [activeModel, pushSystem],
+  );
 
   const openWorkspace = useCallback(() => {
     setModal("workspace");
@@ -632,6 +719,7 @@ export function useAgentSession(options: Options = {}) {
     saveModelConfig,
     revealModels,
     switchModel,
+    setEffort,
     saveWorkspace,
     newSession,
     openSession,

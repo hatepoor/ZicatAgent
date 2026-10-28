@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="Self Evolution Flow" id="self-evolution-flow">
+    <mxGraphModel dx="1500" dy="1050" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1050" math="0" shadow="0" background="#ffffff">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="header" value="zicatAgent 自进化流程：一次任务的经验如何变成下次的能力" style="text;html=1;align=left;verticalAlign=middle;fontSize=22;fontStyle=1;fontColor=#222222;" vertex="1" parent="1">
+          <mxGeometry x="40" y="15" width="1020" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="自进化 = 任务经验写进 SQLite，下次任务开头自动注入 L1；模型权重不变，变的是每轮开局能看到的经验清单" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="48" width="1020" height="24" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend" value="图例" style="swimlane;startSize=24;html=1;fillColor=#ffffff;strokeColor=#9aa3ad;fontSize=11;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="40" width="380" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" value="" style="rounded=0;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="legend">
+          <mxGeometry x="10" y="30" width="18" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1t" value="读 / 运行时" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="34" y="24" width="130" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" value="" style="rounded=0;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="legend">
+          <mxGeometry x="190" y="30" width="18" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2t" value="写 / 存储" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="214" y="24" width="130" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" value="" style="rounded=0;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="legend">
+          <mxGeometry x="10" y="56" width="18" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3t" value="判断" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="34" y="50" width="130" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" value="" style="rounded=0;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="legend">
+          <mxGeometry x="190" y="56" width="18" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4t" value="后台任务" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="214" y="50" width="130" height="24" as="geometry" />
+        </mxCell>
+
+        <mxCell id="b1" value="① 任务开始&#xa;用户提问 / 新会话&#xa;此时模型还没有本次任务的经验" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="80" y="170" width="320" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="b2" value="② 注入 L1 索引&#xa;render_l1()：L2 全量 + L3 前 20&#xa;拼进 system prompt（每个任务开头）&#xa;engine/runner.py:168&#xa;关键：L1 里没有的，模型默认不知道" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="480" y="170" width="320" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="b3" value="③ 执行任务&#xa;调工具干活：code_run / browser / file&#xa;需要细节时 memory_read 读 SOP 正文&#xa;踩坑 → 排查 → 验证成功" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="880" y="170" width="320" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="b4" value="④ 任务结束：判断是否沉淀&#xa;长任务（代码里 ≥10 轮）&#xa;→ start_long_term_update（先读 L0）&#xa;短任务 → 直接 memory_write / patch&#xa;没有价值 → 不写" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="880" y="430" width="320" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="b5" value="⑤ 写入 SQLite（memory/memory.db）&#xa;memory_items：当前正文（可改）&#xa;memory_versions：历史快照（只追加）&#xa;memory_events：读写事件（只追加）&#xa;memory_fts：检索索引" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;align=left;spacingLeft=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="480" y="430" width="320" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="b6" value="⑥ 下次任务召回&#xa;L1 里自动出现 [SKILL] name — summary&#xa;memory_read(name) 取正文 → 照着做&#xa;access_count + 1，热的条目排更前&#xa;同一个坑不再踩第二次" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="80" y="430" width="320" height="150" as="geometry" />
+        </mxCell>
+
+        <mxCell id="bEnd" value="结束&#xa;本次不写记忆" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;fontSize=10.5;align=center;verticalAlign=middle;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="460" width="170" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e12" value="每轮" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#6c8ebf;fontSize=10;fontColor=#555555;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="b1" target="b2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e23" value="任务执行" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#6c8ebf;fontSize=10;fontColor=#555555;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="b2" target="b3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e34" value="任务结束" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#6c8ebf;fontSize=10;fontColor=#555555;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="b3" target="b4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e45" value="写" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#82b366;fontSize=10;fontColor=#555555;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="b4" target="b5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e56" value="索引更新" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#82b366;fontSize=10;fontColor=#555555;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="b5" target="b6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e61" value="下一次任务" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#82b366;fontSize=10;fontColor=#555555;labelBackgroundColor=#ffffff;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="b6" target="b1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4end" value="不写" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;dashed=1;strokeWidth=1.5;strokeColor=#999999;fontSize=10;fontColor=#666666;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="b4" target="bEnd">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="lane" value="后台闭环（可选：scheduler 常驻时才生效）" style="swimlane;startSize=40;html=1;fillColor=#f7f8fa;strokeColor=#9aa3ad;fontSize=13;fontStyle=1;verticalAlign=middle;align=left;spacingLeft=15;" vertex="1" parent="1">
+          <mxGeometry x="40" y="650" width="1420" height="350" as="geometry" />
+        </mxCell>
+        <mxCell id="bar" value="reflect/scheduler.py · 每 120 秒 check() · 12h 归档 / 24h 备份 / 7d 蒸馏" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;fontStyle=1;" vertex="1" parent="lane">
+          <mxGeometry x="20" y="230" width="1380" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="s1" value="每 12h：L4 归档&#xa;temp/model_responses/*.txt&#xa;→ memory/L4_raw_sessions/" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10.5;align=left;spacingLeft=10;verticalAlign=middle;" vertex="1" parent="lane">
+          <mxGeometry x="20" y="70" width="330" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" value="每 7d：记忆蒸馏&#xa;读 salient_mining_sop&#xa;从近 7 天 L4 挖新知识&#xa;memory_write / patch 写回 ⑤" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10.5;align=left;spacingLeft=10;verticalAlign=middle;" vertex="1" parent="lane">
+          <mxGeometry x="390" y="70" width="420" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" value="每 24h：备份 + 导出&#xa;VACUUM INTO backup/*.db&#xa;export/L1,L2（可 diff）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10.5;align=left;spacingLeft=10;verticalAlign=middle;" vertex="1" parent="lane">
+          <mxGeometry x="850" y="70" width="390" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="note" value="不跑 scheduler：①→⑥ 仍成立（任务内写 + 每轮读），只是没有自动归档、蒸馏、备份。启动：python agentmain.py --reflect reflect/scheduler.py 或 /scheduler start scheduler。另一条写入：人工改 memory/kb/*.md → memstore.sync → ⑤（L3 不会自动回写文件）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9aa3ad;dashed=1;fontSize=10;align=left;spacingLeft=10;verticalAlign=middle;fontColor=#555555;" vertex="1" parent="lane">
+          <mxGeometry x="20" y="290" width="1380" height="45" as="geometry" />
+        </mxCell>
+
+        <mxCell id="bar_s1" value="12h" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;dashed=1;strokeColor=#d79b00;fontSize=9.5;fontColor=#8a5a00;labelBackgroundColor=#ffffff;exitX=0.18;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="bar" target="s1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="bar_s3" value="7d" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;dashed=1;strokeColor=#d79b00;fontSize=9.5;fontColor=#8a5a00;labelBackgroundColor=#ffffff;exitX=0.44;exitY=0;exitDx=0;exitDy=0;entryX=0.35;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="bar" target="s3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="bar_s2" value="24h" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;dashed=1;strokeColor=#d79b00;fontSize=9.5;fontColor=#8a5a00;labelBackgroundColor=#ffffff;exitX=0.74;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="bar" target="s2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s1_s3" value="原料" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;dashed=1;strokeColor=#999999;fontSize=9.5;fontColor=#666666;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="s1" target="s3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s3_b5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;dashed=1;strokeWidth=2;strokeColor=#82b366;fontSize=10;fontColor=#3d6b2e;labelBackgroundColor=#ffffff;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="s3" target="b5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s3_label" value="写回新知识" style="text;html=1;align=left;verticalAlign=middle;fontSize=10;fontColor=#3d6b2e;" vertex="1" parent="1">
+          <mxGeometry x="660" y="692" width="110" height="24" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

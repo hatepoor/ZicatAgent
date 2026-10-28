@@ -23,6 +23,7 @@
   <- {"event": "session_new"}             新会话已建立
   <- {"event": "session_switched", "record"}  已切换会话
   <- {"event": "delta", "text"}                          助手回复（整段追加）
+  <- {"event": "thinking", "text"}                       思考内容增量（折叠展示）
   <- {"event": "tool_call", "name", "args"}              工具调用开始（args 为显示摘要）
   <- {"event": "tool_result", "name", "text", "ok"}      工具结果（多行预览）
   <- {"event": "notice", "text"}                         系统提示（挂起、命令回显等）
@@ -113,6 +114,8 @@ def _event_from_item(item: dict) -> dict:
         return {"event": "delta", "text": item["next"]}
     if kind == "delta_token":
         return {"event": "delta", "text": item["next"]}   # token 级增量（真流式）
+    if kind == "thinking_delta":
+        return {"event": "thinking", "text": item["next"]}  # 思考内容增量
     if kind == "tool_call":
         event = {"event": "tool_call", "name": item.get("name", ""),
                  "args": item.get("args", "")}

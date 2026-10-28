@@ -6,9 +6,11 @@
   - agentmain / engine 引用的公共 API（load_L1 / get_global_memory / smart_format /
     consume_file / format_error / safe_print / code_run re-export）
 """
+import atexit
 import os
 import re
 import sys
+import threading
 import time
 
 from agent_types import BaseHandler
@@ -31,12 +33,28 @@ from tools.util import (  # noqa: F401,E402
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
+_L1_LOCK = threading.Lock()
+_L1_TOOLS = None
+
+
+def _l1_tools():
+    """L1 渲染复用一个 MemoryTools/连接，避免每次注入都新建 SQLite 连接。"""
+    global _L1_TOOLS
+    if _L1_TOOLS is None:
+        with _L1_LOCK:
+            if _L1_TOOLS is None:
+                from memstore.tools import MemoryTools
+                _L1_TOOLS = MemoryTools()
+                db = getattr(_L1_TOOLS.store, "db", None)
+                if db is not None:
+                    atexit.register(db.close)
+    return _L1_TOOLS
+
 
 def load_L1():
     """优先从记忆库动态渲染 L1；库不可用时回退到文件。"""
     try:
-        from memstore.tools import MemoryTools
-        store = MemoryTools().store
+        store = _l1_tools().store
         if store is not None:
             return store.render_l1(log=True)
     except Exception:

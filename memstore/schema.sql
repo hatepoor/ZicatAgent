@@ -107,6 +107,10 @@ BEGIN
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_items_fts_upd AFTER UPDATE ON memory_items
+WHEN old.name IS NOT new.name
+  OR old.title IS NOT new.title
+  OR old.summary IS NOT new.summary
+  OR old.body IS NOT new.body
 BEGIN
   INSERT INTO memory_fts(memory_fts, rowid, name, title, summary, body)
   VALUES ('delete', old.rowid, old.name, old.title, old.summary, old.body);
@@ -120,6 +124,6 @@ BEGIN
   VALUES ('delete', old.rowid, old.name, old.title, old.summary, old.body);
 END;
 
-INSERT OR IGNORE INTO schema_meta(key, value) VALUES ('schema_version', '1');
+INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', '2');
 
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;

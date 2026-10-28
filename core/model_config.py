@@ -19,7 +19,22 @@ FIELD_MAP = {
     "context_window": "CONTEXT_WINDOW",
     "max_tokens": "MAX_TOKENS",
     "temperature": "TEMPERATURE",
+    "provider": "PROVIDER",
+    "reasoning_effort": "REASONING_EFFORT",
 }
+
+PROVIDERS = ("openai", "deepseek")
+
+# 当前只做 DeepSeek；openai 走通用 Chat Completions。
+REASONING_EFFORT_OPTIONS = {
+    "openai": ["low", "medium", "high"],
+    "deepseek": ["off", "low", "medium", "high", "xhigh", "max"],
+}
+
+
+def provider_of(cfg: dict) -> str:
+    provider = str(cfg.get("provider") or "openai").strip().lower()
+    return provider if provider in PROVIDERS else "openai"
 
 
 def mask_key(value: str) -> str:
@@ -39,6 +54,7 @@ def list_models(reveal: bool = False) -> list[dict]:
     out = []
     for i, cfg in enumerate(oai_configs()):
         raw_key = cfg.get("apikey") or cfg.get("api_key") or ""
+        provider = provider_of(cfg)
         out.append({
             "index": i,
             "env_index": i + 1,
@@ -49,6 +65,9 @@ def list_models(reveal: bool = False) -> list[dict]:
             "context_window": cfg.get("context_window") or cfg.get("context") or "",
             "max_tokens": cfg.get("max_tokens") or cfg.get("max_output") or "",
             "temperature": cfg.get("temperature", ""),
+            "provider": provider,
+            "reasoning_effort": cfg.get("reasoning_effort", ""),
+            "reasoning_effort_options": REASONING_EFFORT_OPTIONS.get(provider, []),
         })
     return out
 
@@ -69,6 +88,12 @@ def upsert_env(text: str, key: str, value) -> str:
     if text and not text.endswith("\n"):
         text += "\n"
     return text + line + "\n"
+
+
+def remove_env(text: str, key: str) -> str:
+    """删除 .env 中的一行（用于切换接口后清理不兼容的思考强度）。"""
+    pattern = re.compile(rf'^\s*(?:export\s+)?{re.escape(key)}\s*=.*\n?', re.MULTILINE)
+    return pattern.sub("", text, count=1)
 
 
 def _atomic_write(path: str, text: str) -> None:
@@ -111,6 +136,25 @@ def save_model(index: int, values: dict, env_path: str | None = None) -> list[di
             continue
         merged[field] = str(value).strip()
 
+    incoming_provider = str((values or {}).get("provider") or "").strip().lower()
+    if incoming_provider and incoming_provider not in PROVIDERS:
+        raise ValueError(
+            f"未知接口类型: {incoming_provider}（可选: {', '.join(PROVIDERS)}）"
+        )
+    merged["provider"] = incoming_provider or provider_of(merged)
+
+    allowed_efforts = REASONING_EFFORT_OPTIONS.get(merged["provider"], [])
+    incoming_effort = str((values or {}).get("reasoning_effort") or "").strip().lower()
+    if incoming_effort and incoming_effort not in allowed_efforts:
+        raise ValueError(
+            f"{merged['provider']} 不支持思考强度 {incoming_effort}；"
+            f"可选: {', '.join(allowed_efforts)}"
+        )
+    current_effort = str(merged.get("reasoning_effort") or "").strip().lower()
+    drop_effort = bool(current_effort and current_effort not in allowed_efforts)
+    if drop_effort:
+        merged.pop("reasoning_effort", None)
+
     if not merged.get("base_url"):
         raise ValueError("Base URL 不能为空")
     if not merged.get("model"):
@@ -132,6 +176,8 @@ def save_model(index: int, values: dict, env_path: str | None = None) -> list[di
             if field == "api_key" and merged[field] == current.get("api_key"):
                 continue  # 未修改就不重写 Key
             text = upsert_env(text, prefix + suffix, merged[field])
+    if drop_effort:
+        text = remove_env(text, prefix + "REASONING_EFFORT")
     _atomic_write(path, text)
     if env_path is None:
         mykeys_store.reload(force=True)
@@ -171,5 +217,8 @@ def list_models_after_write(path: str, index: int) -> list[dict]:
             "context_window": cfg.get("context_window") or cfg.get("context") or "",
             "max_tokens": cfg.get("max_tokens") or cfg.get("max_output") or "",
             "temperature": cfg.get("temperature", ""),
+            "provider": provider_of(cfg),
+            "reasoning_effort": cfg.get("reasoning_effort", ""),
+            "reasoning_effort_options": REASONING_EFFORT_OPTIONS.get(provider_of(cfg), []),
         })
     return out
