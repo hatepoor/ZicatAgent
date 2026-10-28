@@ -1,4 +1,4 @@
-import json, threading, time, uuid, queue, socket, requests, traceback
+import json, os, threading, time, uuid, queue, socket, requests, traceback
 from typing import Any
 from simple_websocket_server import WebSocketServer, WebSocket
 import bottle
@@ -106,7 +106,14 @@ class TMWebDriver:
         @app.route('/link', method=['GET','POST'])
         def link():
             data = request.json
-            if data.get('cmd') == 'get_all_sessions': return json.dumps({'r': self.get_all_sessions()}, ensure_ascii=False)  
+            if data.get('cmd') == 'get_all_sessions':
+                return json.dumps({'r': self.get_all_sessions(), 'default': self.default_session_id}, ensure_ascii=False)
+            if data.get('cmd') == 'set_default':
+                sid = str(data.get('sessionId'))
+                if sid in self.sessions:
+                    self.default_session_id = sid
+                    return json.dumps({'r': True})
+                return json.dumps({'r': False})
             if data.get('cmd') == 'find_session': 
                 url_pattern = data.get('url_pattern', '')
                 return json.dumps({'r': self.find_session(url_pattern)}, ensure_ascii=False)
@@ -208,11 +215,12 @@ class TMWebDriver:
             if session.ws_client == client: session.mark_disconnected()
     
     def execute_js(self, code, timeout=15, session_id=None) -> Any:  
-        if session_id is None: session_id = str(self.default_session_id)
+        if session_id is None: session_id = self.default_session_id
         if self.is_remote:
             safe_print('remote_execute_js')
-            response = self._remote_cmd({"cmd": "execute_js", "sessionId": session_id, 
-                                         "code": code, "timeout": str(timeout)}).get('r', {})
+            cmd = {"cmd": "execute_js", "code": code, "timeout": str(timeout)}
+            if session_id is not None: cmd["sessionId"] = str(session_id)
+            response = self._remote_cmd(cmd).get('r', {})
             if response.get('error'): raise Exception(response['error'])
             return response
  
@@ -276,9 +284,20 @@ class TMWebDriver:
 
     def get_all_sessions(self):  
         if self.is_remote:
-            return self._remote_cmd({"cmd": "get_all_sessions"}).get('r', [])
+            resp = self._remote_cmd({"cmd": "get_all_sessions"})
+            if resp.get('default') is not None:
+                self.default_session_id = str(resp['default'])
+            return resp.get('r', [])
         return [{'id': session.id, **session.info} for session in self.sessions.values()
                 if session.is_active()]  
+
+    def set_default_session(self, session_id):
+        """切换默认会话;remote 模式下同步到 master 端"""
+        self.default_session_id = str(session_id)
+        if self.is_remote:
+            try: self._remote_cmd({"cmd": "set_default", "sessionId": str(session_id)})
+            except Exception: pass
+        return self.default_session_id
 
     def get_session_dict(self):
         return {session['id']: session['url'] for session in self.get_all_sessions()}
@@ -308,4 +327,10 @@ class TMWebDriver:
     def jump(self, url, timeout=10): self.execute_js(f"window.location.href='{url}'", timeout=timeout)
     
 if __name__ == "__main__":
-    driver = TMWebDriver(host='127.0.0.1', port=18765)
+    d = TMWebDriver(host='127.0.0.1', port=18765)
+    if d.is_remote:
+        safe_print("已有 TMWebDriver master 在运行，本进程退出")
+        raise SystemExit(0)
+    safe_print(f"TMWebDriver master 常驻运行中 (pid={os.getpid()})")
+    while True:
+        time.sleep(3600)

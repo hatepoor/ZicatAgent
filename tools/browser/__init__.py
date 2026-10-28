@@ -1,9 +1,10 @@
 """浏览器工具：web_scan / web_execute_js（TMWebDriver 桥）。"""
 from __future__ import annotations
 
-import importlib
 import json
 import os
+import subprocess
+import sys
 import time
 
 from agent_types import json_default
@@ -13,9 +14,44 @@ from tools.util import format_error, smart_format
 driver = None
 
 
+def _master_alive(port=18766, timeout=0.3):
+    import socket
+    s = socket.socket()
+    s.settimeout(timeout)
+    try:
+        return s.connect_ex(('127.0.0.1', port)) == 0
+    finally:
+        s.close()
+
+
+def _ensure_master(timeout=15):
+    """优先接入常驻 master；没有则后台拉起一个，避免每个 agent 进程各自起服务导致扩展反复重连。"""
+    if _master_alive():
+        return True
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    entry = os.path.join(root, "TMWebDriver.py")
+    flags = 0
+    if sys.platform == 'win32':
+        flags = (subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+                 | subprocess.CREATE_NO_WINDOW)
+    try:
+        subprocess.Popen([sys.executable, entry], cwd=root, stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         creationflags=flags)
+    except Exception:
+        return False
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if _master_alive():
+            return True
+        time.sleep(0.25)
+    return False
+
+
 def first_init_driver(max_wait=60):
     global driver
     from TMWebDriver import TMWebDriver
+    _ensure_master()
     driver = TMWebDriver()
     opened = False
     for i in range(max_wait):
@@ -54,7 +90,7 @@ def _web_scan(tabs_only=False, switch_tab_id=None, text_only=False, maxlen=35000
             sess['url'] = sess.get('url', '')[:50] + ("..." if len(sess.get('url', '')) > 50 else "")
             tabs.append(sess)
         if switch_tab_id:
-            driver.default_session_id = switch_tab_id
+            driver.set_default_session(switch_tab_id)
         result = {
             "status": "success",
             "metadata": {
@@ -63,7 +99,6 @@ def _web_scan(tabs_only=False, switch_tab_id=None, text_only=False, maxlen=35000
             }
         }
         if not tabs_only:
-            importlib.reload(simphtml)
             result["content"] = simphtml.get_html(driver, cutlist=True, maxchars=maxlen,
                                                   text_only=text_only)
             if text_only:
@@ -84,7 +119,7 @@ def _web_execute_js(script, switch_tab_id=None, no_monitor=False):
         if len(driver.get_all_sessions()) == 0:
             return {"status": "error", "msg": NO_TAB_HINT}
         if switch_tab_id:
-            driver.default_session_id = str(switch_tab_id)
+            driver.set_default_session(switch_tab_id)
         result = simphtml.execute_js_rich(script, driver, no_monitor=no_monitor)
         return result
     except Exception as e:

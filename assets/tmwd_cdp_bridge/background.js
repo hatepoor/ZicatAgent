@@ -213,6 +213,7 @@ function buildCdpScript(code) {
 // --- WebSocket Client for TMWebDriver ---
 let ws = null;
 let status = 'connected';
+let reconnectDelay = 500; // fast exponential backoff: 0.5s/1s/2s/4s, cap 5s
 const WS_URL = 'ws://127.0.0.1:18765';
 function setStatus(s){if(s===status)return;status=s;chrome.tabs.query({}).then(T=>T.forEach(t=>chrome.tabs.sendMessage(t.id,{type:'tmwd_status',data:s}).catch(()=>{})));}
 
@@ -352,6 +353,7 @@ function connectWS() {
   }
   ws.onopen = async () => {
     console.log('[TMWD-WS] Connected!');
+    reconnectDelay = 500;
     setStatus('connected');
     scheduleKeepalive(); // Keep SW alive while connected
     const tabs = (await chrome.tabs.query({})).filter(t => isScriptable(t.url));
@@ -393,6 +395,10 @@ function connectWS() {
     console.log('[TMWD-WS] Disconnected');
     setStatus('connecting');
     ws = null;
+    // Immediate exponential-backoff reconnect; alarms stay as fallback when SW is suspended
+    const delay = reconnectDelay;
+    reconnectDelay = Math.min(reconnectDelay * 2, 5000);
+    setTimeout(() => { if (!ws || ws.readyState > 1) connectWS(); }, delay);
     scheduleProbe();
   };
   ws.onerror = (e) => {
